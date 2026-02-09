@@ -1,9 +1,11 @@
 import { Role, DashboardStats, ChapterMonthlyReport, EventReport, User, Region, District, Zone, Area, Chapter, EventType } from '../types';
 import { supabase } from './supabaseClient';
 
+const REGISTRY_LIMIT = 10000;
+
 export const apiService = {
   getUsers: async (): Promise<User[]> => {
-      const { data, error } = await supabase.from('profiles').select('*').order('name');
+      const { data, error } = await supabase.from('profiles').select('*').limit(REGISTRY_LIMIT).order('name');
       if (error) throw new Error(`Registry Load Error: ${error.message}`);
       return (data || []).map(p => ({
           id: p.id, name: p.name, username: p.username, email: p.email,
@@ -51,13 +53,13 @@ export const apiService = {
   },
 
   getRegions: async (): Promise<Region[]> => {
-    const { data, error } = await supabase.from('regions').select('*').order('name');
+    const { data, error } = await supabase.from('regions').select('*').limit(REGISTRY_LIMIT).order('name');
     if (error) throw new Error(`Region Sync Error: ${error.message}`);
     return (data || []).map(r => ({ id: r.id, name: r.name, nationalId: r.national_id || 'national' }));
   },
 
   getDistricts: async (regionId?: string): Promise<District[]> => {
-    let q = supabase.from('districts').select('*').order('name');
+    let q = supabase.from('districts').select('*').limit(REGISTRY_LIMIT).order('name');
     if (regionId) q = q.eq('region_id', regionId);
     const { data, error } = await q;
     if (error) throw new Error(`District Sync Error: ${error.message}`);
@@ -65,7 +67,7 @@ export const apiService = {
   },
 
   getZones: async (districtId?: string): Promise<Zone[]> => {
-    let q = supabase.from('zones').select('*').order('name');
+    let q = supabase.from('zones').select('*').limit(REGISTRY_LIMIT).order('name');
     if (districtId) q = q.eq('district_id', districtId);
     const { data, error } = await q;
     if (error) throw new Error(`Zone Sync Error: ${error.message}`);
@@ -73,7 +75,7 @@ export const apiService = {
   },
 
   getAreas: async (zoneId?: string): Promise<Area[]> => {
-    let q = supabase.from('areas').select('*').order('name');
+    let q = supabase.from('areas').select('*').limit(REGISTRY_LIMIT).order('name');
     if (zoneId) q = q.eq('zone_id', zoneId);
     const { data, error } = await q;
     if (error) throw new Error(`Area Sync Error: ${error.message}`);
@@ -81,7 +83,7 @@ export const apiService = {
   },
 
   getChapters: async (areaId?: string): Promise<Chapter[]> => {
-    let q = supabase.from('chapters').select('*').order('name');
+    let q = supabase.from('chapters').select('*').limit(REGISTRY_LIMIT).order('name');
     if (areaId) q = q.eq('area_id', areaId);
     const { data, error } = await q;
     if (error) throw new Error(`Chapter Sync Error: ${error.message}`);
@@ -120,7 +122,7 @@ export const apiService = {
   deleteChapter: (id: string) => supabase.from('chapters').delete().eq('id', id),
 
   getEventTypes: async (): Promise<EventType[]> => {
-    const { data, error } = await supabase.from('event_types').select('*').order('name');
+    const { data, error } = await supabase.from('event_types').select('*').limit(REGISTRY_LIMIT).order('name');
     if (error) throw new Error(`Event Types Sync Error: ${error.message}`);
     return data || [];
   },
@@ -132,14 +134,14 @@ export const apiService = {
 
   getAllDescendantIds: async (unitId: string): Promise<{ descendantIds: string[], chapterIds: string[] }> => {
     if (unitId === 'national') {
-      const [chaps] = await Promise.all([supabase.from('chapters').select('id')]);
+      const [chaps] = await Promise.all([supabase.from('chapters').select('id').limit(REGISTRY_LIMIT)]);
       return { descendantIds: ['national'], chapterIds: (chaps.data as any[])?.map(c => c.id) || [] };
     }
     const [dists, zones, areas, chaps] = await Promise.all([
-      supabase.from('districts').select('id, region_id'),
-      supabase.from('zones').select('id, district_id'),
-      supabase.from('areas').select('id, zone_id'),
-      supabase.from('chapters').select('id, area_id')
+      supabase.from('districts').select('id, region_id').limit(REGISTRY_LIMIT),
+      supabase.from('zones').select('id, district_id').limit(REGISTRY_LIMIT),
+      supabase.from('areas').select('id, zone_id').limit(REGISTRY_LIMIT),
+      supabase.from('chapters').select('id, area_id').limit(REGISTRY_LIMIT)
     ]);
     const descendantIds: string[] = [unitId];
     const chapterIds: string[] = [];
@@ -158,7 +160,7 @@ export const apiService = {
     const year = new Date().getFullYear();
     const { descendantIds, chapterIds } = await apiService.getAllDescendantIds(unitId);
 
-    let officerQ = supabase.from('profiles').select('id');
+    let officerQ = supabase.from('profiles').select('id').limit(REGISTRY_LIMIT);
     if (unitId !== 'national') officerQ = officerQ.in('unit_id', descendantIds);
     const { data: profiles } = await officerQ;
     const officerIds = (profiles as any[])?.map(p => p.id) || [];
@@ -169,8 +171,8 @@ export const apiService = {
         apiService.getZones(),
         apiService.getAreas(),
         apiService.getChapters(),
-        supabase.from('chapter_reports').select('*').in('chapter_id', chapterIds).eq('year', year),
-        supabase.from('event_reports').select('*').in('reporting_officer_id', officerIds).gte('date_of_event', `${year}-01-01`).lte('date_of_event', `${year}-12-31`)
+        supabase.from('chapter_reports').select('*').in('chapter_id', chapterIds).eq('year', year).limit(REGISTRY_LIMIT),
+        supabase.from('event_reports').select('*').in('reporting_officer_id', officerIds).gte('date_of_event', `${year}-01-01`).lte('date_of_event', `${year}-12-31`).limit(REGISTRY_LIMIT)
     ]);
 
     const regs = results[0] as Region[];
@@ -204,7 +206,7 @@ export const apiService = {
                (filteredEvents.filter(r => new Date(r.date_of_event).toLocaleString('default', { month: 'long' }) === m).reduce((sum, r) => sum + (r.attendance || 0), 0) || 0)
     }));
 
-    const { data: allProfiles } = await supabase.from('profiles').select('id, unit_id');
+    const { data: allProfiles } = await supabase.from('profiles').select('id, unit_id').limit(REGISTRY_LIMIT);
     const officerToUnitMap = new Map<string, string>((allProfiles as any[] || []).map(p => [p.id as string, p.unit_id as string]));
 
     const breakdown: any[] = [];
@@ -254,7 +256,7 @@ export const apiService = {
     const targetUnitId = f.chapterId || f.areaId || f.zoneId || f.districtId || f.regionId || user?.unitId;
     if (!targetUnitId) return [];
     const { chapterIds } = await apiService.getAllDescendantIds(targetUnitId);
-    let q = supabase.from('chapter_reports').select('*');
+    let q = supabase.from('chapter_reports').select('*').limit(REGISTRY_LIMIT);
     if (chapterIds.length > 0) q = q.in('chapter_id', chapterIds);
     else q = q.eq('chapter_id', 'NONE');
     if (f.startDate) q = q.gte('year', new Date(f.startDate).getFullYear());
@@ -270,7 +272,7 @@ export const apiService = {
     const { descendantIds } = await apiService.getAllDescendantIds(targetUnitId);
     
     // We need to fetch profiles to know WHICH unit each event belongs to for grouping in reports
-    const { data: allProfiles } = await supabase.from('profiles').select('id, unit_id');
+    const { data: allProfiles } = await supabase.from('profiles').select('id, unit_id').limit(REGISTRY_LIMIT);
     const officerToUnitMap = new Map<string, string>((allProfiles as any[] || []).map(p => [p.id, p.unit_id]));
     
     // Filter officer IDs based on whether their unit is within the target scope
@@ -278,7 +280,7 @@ export const apiService = {
         ?.filter(p => targetUnitId === 'national' || descendantIds.includes(p.unit_id))
         .map(p => p.id) || [];
 
-    let q = supabase.from('event_reports').select('*');
+    let q = supabase.from('event_reports').select('*').limit(REGISTRY_LIMIT);
     if (officerIds.length > 0) q = q.in('reporting_officer_id', officerIds);
     else q = q.eq('reporting_officer_id', 'NONE');
     
@@ -306,7 +308,7 @@ export const apiService = {
   deleteReportsByScope: async (scope: any, unitId: string, fromYear: number, toYear: number) => {
       const { chapterIds, descendantIds } = await apiService.getAllDescendantIds(unitId);
       if (chapterIds.length > 0) await supabase.from('chapter_reports').delete().in('chapter_id', chapterIds).gte('year', fromYear).lte('year', toYear);
-      const { data: profiles } = await supabase.from('profiles').select('id').in('unit_id', descendantIds);
+      const { data: profiles } = await supabase.from('profiles').select('id').in('unit_id', descendantIds).limit(REGISTRY_LIMIT);
       const officerIds = (profiles as any[])?.map(p => p.id) || [];
       if (officerIds.length > 0) await supabase.from('event_reports').delete().in('reporting_officer_id', officerIds).gte('date_of_event', `${fromYear}-01-01`).lte('date_of_event', `${toYear}-12-31`);
       return { success: true };

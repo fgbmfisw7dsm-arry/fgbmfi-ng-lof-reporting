@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { AuthContext } from '../../context/AuthContext';
 import { DataContext } from '../../context/DataContext';
@@ -34,12 +33,13 @@ const DashboardPage: React.FC = () => {
 
   const displayStats = useMemo(() => filteredView?.stats || stats, [filteredView, stats]);
 
-  const handleSliceClick = async (slice: { name: string; unitId: string; role: Role }) => {
-    if (!slice.unitId || !slice.role) return;
+  const handleSliceClick = async (slice: any) => {
+    // Robust check for required drill-down properties
+    if (!slice || !slice.unitId || !slice.role) return;
 
     setLoading(true);
     try {
-        const data = await apiService.getDashboardData(slice.role, slice.unitId);
+        const data = await apiService.getDashboardData(slice.role as Role, slice.unitId);
         setFilteredView({
             name: slice.name,
             stats: data,
