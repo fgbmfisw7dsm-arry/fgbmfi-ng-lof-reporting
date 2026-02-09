@@ -1,0 +1,250 @@
+
+import React, { useState, useEffect, useContext, useMemo } from 'react';
+import ReportTable from './ReportTable';
+import { ChapterMonthlyReport, Role, EventReport, Region, District, Zone, Area, Chapter } from '../../types';
+import { AuthContext } from '../../context/AuthContext';
+import { DataContext } from '../../context/DataContext';
+import { apiService } from '../../services/apiService';
+import { exportService } from '../../services/exportService';
+import { ReportFiltersSection } from './ReportFiltersSection';
+import Icon from '../ui/Icon';
+
+const ReportsPage: React.FC = () => {
+  const { user } = useContext(AuthContext);
+  const { dataVersion } = useContext(DataContext);
+  const [reports, setReports] = useState<ChapterMonthlyReport[]>([]);
+  const [eventReports, setEventReports] = useState<EventReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  const [orgRegistry, setOrgRegistry] = useState<{
+    regions: Region[], districts: District[], zones: Zone[], areas: Area[], chapters: Chapter[]
+  }>({ regions: [], districts: [], zones: [], areas: [], chapters: [] });
+
+  const [filters, setFilters] = useState({
+    regionId: null as string | null,
+    districtId: null as string | null,
+    zoneId: null as string | null,
+    areaId: null as string | null,
+    chapterId: null as string | null,
+    startDate: '',
+    endDate: '',
+  });
+
+  useEffect(() => {
+    const fetchOrg = async () => {
+        try {
+            const [regs, dists, zones, areas, chaps] = await Promise.all([
+                apiService.getRegions(), apiService.getDistricts(), apiService.getZones(), apiService.getAreas(), apiService.getChapters()
+            ]);
+            setOrgRegistry({ regions: regs, districts: dists, zones: zones, areas: areas, chapters: chaps });
+        } catch (e) { console.error("Org Registry Sync Failed", e); }
+    };
+    fetchOrg();
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchReports = async () => {
+      if (user) {
+        setLoading(true);
+        try {
+            const [chapterReportsData, eventReportsData] = await Promise.all([
+                apiService.getChapterReports(filters, user),
+                apiService.getEventReports(filters, user)
+            ]);
+            if (mounted) {
+                setReports(chapterReportsData);
+                setEventReports(eventReportsData);
+                setLoading(false);
+            }
+        } catch (err) {
+            console.error("Report Fetch Failed", err);
+            setLoading(false);
+        }
+      }
+    };
+    fetchReports();
+    return () => { mounted = false; };
+  }, [user, filters, dataVersion]);
+
+  const handleFilterChange = (level: any, value: string | null) => {
+    setFilters(prev => {
+        const newFilters = { ...prev, [level]: value };
+        const cascadeLevels: (keyof typeof filters)[] = ['regionId', 'districtId', 'zoneId', 'areaId', 'chapterId'];
+        const startIndex = cascadeLevels.indexOf(level as any);
+        if (startIndex !== -1) {
+            for (let i = startIndex + 1; i < cascadeLevels.length; i++) {
+                (newFilters as any)[cascadeLevels[i]] = null;
+            }
+        }
+        return newFilters;
+    });
+  };
+
+  const handleDateChange = (key: 'startDate' | 'endDate', value: string) => {
+      setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const breakdownData = useMemo(() => {
+    if (filters.chapterId) return [];
+    
+    let groupBy: 'chapter' | 'area' | 'zone' | 'district' | 'region' | 'none' = 'region';
+    let nextLevelUnits: {id: string, name: string}[] = [];
+    let currentScopeUnitId: string | null = null;
+    let currentScopeRole: Role | null = null;
+    let currentScopeName = "Office Events";
+
+    if (filters.areaId) {
+        groupBy = 'chapter';
+        nextLevelUnits = orgRegistry.chapters.filter(c => c.areaId === filters.areaId);
+        currentScopeUnitId = filters.areaId;
+        currentScopeRole = Role.FIELD_REPRESENTATIVE;
+        currentScopeName = "Area Events";
+    } else if (filters.zoneId) {
+        groupBy = 'area';
+        nextLevelUnits = orgRegistry.areas.filter(a => a.zoneId === filters.zoneId);
+        currentScopeUnitId = filters.zoneId;
+        currentScopeRole = Role.NATIONAL_DIRECTOR;
+        currentScopeName = "Zonal Events";
+    } else if (filters.districtId) {
+        groupBy = 'zone';
+        nextLevelUnits = orgRegistry.zones.filter(z => z.districtId === filters.districtId);
+        currentScopeUnitId = filters.districtId;
+        currentScopeRole = Role.DISTRICT_COORDINATOR;
+        currentScopeName = "District Events";
+    } else if (filters.regionId) {
+        groupBy = 'district';
+        nextLevelUnits = orgRegistry.districts.filter(d => d.regionId === filters.regionId);
+        currentScopeUnitId = filters.regionId;
+        currentScopeRole = Role.REGIONAL_VICE_PRESIDENT;
+        currentScopeName = "Regional Events";
+    } else if (user) {
+        switch (user.role) {
+            case Role.FIELD_REPRESENTATIVE:
+                 groupBy = 'chapter';
+                 nextLevelUnits = orgRegistry.chapters.filter(c => c.areaId === user.unitId);
+                 currentScopeUnitId = user.unitId;
+                 currentScopeRole = Role.FIELD_REPRESENTATIVE;
+                 currentScopeName = "Area Events";
+                 break;
+            case Role.NATIONAL_DIRECTOR:
+                 groupBy = 'area';
+                 nextLevelUnits = orgRegistry.areas.filter(a => a.zoneId === user.unitId);
+                 currentScopeUnitId = user.unitId;
+                 currentScopeRole = Role.NATIONAL_DIRECTOR;
+                 currentScopeName = "Zonal Events";
+                 break;
+            case Role.DISTRICT_COORDINATOR:
+            case Role.DISTRICT_ADMIN:
+                 groupBy = 'zone';
+                 nextLevelUnits = orgRegistry.zones.filter(z => z.districtId === user.unitId);
+                 currentScopeUnitId = user.unitId;
+                 currentScopeRole = Role.DISTRICT_COORDINATOR;
+                 currentScopeName = "District Events";
+                 break;
+            case Role.REGIONAL_VICE_PRESIDENT:
+            case Role.REGIONAL_ADMIN:
+                 groupBy = 'district';
+                 nextLevelUnits = orgRegistry.districts.filter(d => d.regionId === user.unitId);
+                 currentScopeUnitId = user.unitId;
+                 currentScopeRole = Role.REGIONAL_VICE_PRESIDENT;
+                 currentScopeName = "Regional Events";
+                 break;
+            default:
+                 groupBy = 'region';
+                 nextLevelUnits = orgRegistry.regions;
+                 currentScopeUnitId = 'national';
+                 currentScopeRole = Role.NATIONAL_PRESIDENT;
+                 currentScopeName = "National Events";
+                 break;
+        }
+    }
+    
+    const sumData = (acc: any, curr: any) => ({
+        membershipCount: (acc.membershipCount || 0) + (curr.membershipCount || 0),
+        attendance: (acc.attendance || 0) + (curr.attendance || 0),
+        firstTimers: (acc.firstTimers || 0) + (curr.firstTimers || 0),
+        salvations: (acc.salvations || 0) + (curr.salvations || 0),
+        holyGhostBaptism: (acc.holyGhostBaptism || 0) + (curr.holyGhostBaptism || 0),
+        membershipIntention: (acc.membershipIntention || 0) + (curr.membershipIntention || 0),
+        offering: (acc.offering || 0) + (curr.offering || 0),
+    });
+    const identity = { membershipCount: 0, attendance: 0, firstTimers: 0, salvations: 0, holyGhostBaptism: 0, membershipIntention: 0, offering: 0 };
+
+    const rows: any[] = [];
+
+    // 1. Current Scope Summary (Direct events for this unit level)
+    if (currentScopeUnitId && currentScopeRole) {
+         const scopeEvents = eventReports.filter(r => r.unitId === currentScopeUnitId);
+         const cpReports = (currentScopeRole === Role.CHAPTER_PRESIDENT) ? reports.filter(r => r.chapterId === currentScopeUnitId) : [];
+         if (scopeEvents.length > 0 || cpReports.length > 0 || (nextLevelUnits.length > 0 && currentScopeRole !== Role.CHAPTER_PRESIDENT)) {
+            rows.push({ id: `scope-${currentScopeUnitId}`, name: currentScopeName, ...sumData(scopeEvents.reduce(sumData, identity), cpReports.reduce(sumData, identity)) });
+         }
+    }
+
+    // 2. Child Units Rollup
+    nextLevelUnits.forEach(unit => {
+        const descendantChapterIds: string[] = [];
+        const descendantUnitIds: string[] = [unit.id]; 
+
+        const localFind = (currId: string) => {
+            orgRegistry.districts.filter(d => d.regionId === currId).forEach(d => { descendantUnitIds.push(d.id); localFind(d.id); });
+            orgRegistry.zones.filter(z => z.districtId === currId).forEach(z => { descendantUnitIds.push(z.id); localFind(z.id); });
+            orgRegistry.areas.filter(a => a.zoneId === currId).forEach(a => { descendantUnitIds.push(a.id); localFind(a.id); });
+            orgRegistry.chapters.filter(c => c.areaId === currId).forEach(c => { descendantChapterIds.push(c.id); descendantUnitIds.push(c.id); });
+        };
+        
+        if (groupBy === 'chapter') {
+            descendantChapterIds.push(unit.id);
+            descendantUnitIds.push(unit.id);
+        } else {
+            localFind(unit.id);
+        }
+        
+        const unitReports = reports.filter(r => descendantChapterIds.includes(r.chapterId));
+        const unitEvents = eventReports.filter(r => descendantUnitIds.includes(r.unitId)); 
+        
+        const unitSum = sumData(unitReports.reduce(sumData, identity), unitEvents.reduce(sumData, identity));
+        rows.push({ id: unit.id, name: unit.name, ...unitSum });
+    });
+
+    if (rows.length > 0) {
+        rows.push({ id: 'total-row', name: 'GRAND TOTAL SUMMARY', ...rows.reduce(sumData, identity), isTotal: true });
+    }
+    return rows; 
+  }, [reports, eventReports, filters, user, orgRegistry]);
+
+  const reportMetadata = useMemo(() => {
+    let unitName = ""; let suffix = ""; let targetOffice = "";
+    const cleanRole = (r: string) => r.replace(/\s*\(.*\)/, '').trim();
+    if (filters.chapterId) { unitName = orgRegistry.chapters.find(c => c.id === filters.chapterId)?.name || ""; targetOffice = "Chapter President"; }
+    else if (filters.areaId) { unitName = orgRegistry.areas.find(a => a.id === filters.areaId)?.name || ""; targetOffice = "Field Representative"; }
+    else if (filters.zoneId) { unitName = orgRegistry.zones.find(z => z.id === filters.zoneId)?.name || ""; targetOffice = "National Director"; }
+    else if (filters.districtId) { unitName = orgRegistry.districts.find(d => d.id === filters.districtId)?.name || ""; if (unitName && !unitName.toLowerCase().includes('district')) suffix = " District"; targetOffice = "District Coordinator"; }
+    else if (filters.regionId) { unitName = orgRegistry.regions.find(r => r.id === filters.regionId)?.name || ""; if (unitName && !unitName.toLowerCase().includes('region')) suffix = " Region"; targetOffice = "Regional Vice President"; } 
+    if (!unitName && user) { targetOffice = cleanRole(user.role); if (user.role === Role.CHAPTER_PRESIDENT) unitName = orgRegistry.chapters.find(c => c.id === user.unitId)?.name || ""; else if (user.role === Role.FIELD_REPRESENTATIVE) unitName = orgRegistry.areas.find(a => a.id === user.unitId)?.name || ""; else if (user.role === Role.NATIONAL_DIRECTOR) unitName = orgRegistry.zones.find(z => z.id === user.unitId)?.name || ""; else if (user.role === Role.DISTRICT_COORDINATOR || user.role === Role.DISTRICT_ADMIN) { unitName = orgRegistry.districts.find(d => d.id === user.unitId)?.name || ""; if (unitName && !unitName.toLowerCase().includes('district')) suffix = " District"; } else if (user.role === Role.REGIONAL_VICE_PRESIDENT || user.role === Role.REGIONAL_ADMIN) { unitName = orgRegistry.regions.find(r => r.id === user.unitId)?.name || ""; if (unitName && !unitName.toLowerCase().includes('region')) suffix = " Region"; } else { unitName = "National Headquarters"; targetOffice = "Administration"; } }
+    const finalUnit = unitName ? (unitName === "National Headquarters" ? unitName : `${unitName}${suffix}`) : "National Headquarters";
+    return { unit: finalUnit, title: `FGBMFI Nigeria LOF - ${finalUnit}`, subTitle: `${targetOffice} | ${finalUnit}` };
+  }, [filters, user, orgRegistry]);
+
+  return (
+    <div className="printable-area">
+      <div className="flex justify-between items-center mb-6 print:hidden">
+        <h1 className="text-3xl font-bold text-gray-800">Reports Portal</h1>
+        <div className="flex space-x-2">
+            <button onClick={() => exportService.toPDF(reportMetadata.title, reportMetadata.subTitle, filters.startDate ? `Period: ${filters.startDate} to ${filters.endDate}` : "Period: All Recorded History", breakdownData.length > 0 && !filters.chapterId, breakdownData.length > 0 && !filters.chapterId ? breakdownData : reports)} className="bg-fgbmfi-red text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-800 flex items-center shadow-sm active:scale-95"><Icon name="archive-box" className="w-4 h-4 mr-2"/>Export PDF</button>
+            <button onClick={() => exportService.toCSV(reportMetadata.title, reportMetadata.subTitle, filters.startDate ? `Period: ${filters.startDate} to ${filters.endDate}` : "Period: All Recorded History", breakdownData.length > 0 && !filters.chapterId, breakdownData.length > 0 && !filters.chapterId ? breakdownData : reports)} className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 flex items-center shadow-sm active:scale-95"><Icon name="report" className="w-4 h-4 mr-2"/>Export Excel</button>
+        </div>
+      </div>
+      <ReportFiltersSection filters={filters} handleFilterChange={handleFilterChange} handleDateChange={handleDateChange} />
+      {loading ? ( <div className="p-20 text-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-fgbmfi-blue mx-auto mb-4"></div><p className="text-xs font-black uppercase text-gray-400">Syncing Cloud Reports...</p></div> ) : (
+        <>
+            {breakdownData.length > 0 && !filters.chapterId && ( <div className="mb-6 mt-6"><h2 className="text-lg font-black text-fgbmfi-blue mb-4 uppercase tracking-tight">{reportMetadata.unit} - Summary Breakdown</h2><ReportTable data={breakdownData} isAggregated={true} /></div> )}
+            {((filters.chapterId && reports.length > 0) || (user?.role === Role.CHAPTER_PRESIDENT && reports.length > 0)) && ( <div className="mt-8"><h2 className="text-lg font-black text-fgbmfi-blue mb-4 uppercase tracking-tight">Monthly Activity History</h2><ReportTable data={reports} /></div> )}
+            {breakdownData.length === 0 && reports.length === 0 && ( <div className="bg-white p-20 rounded-[2rem] shadow-sm border border-gray-100 text-center"><Icon name="archive-box" className="w-12 h-12 text-gray-200 mx-auto mb-4" /><p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">No reporting records found for this unit.</p></div> )}
+        </>
+      )}
+    </div>
+  );
+};
+export default ReportsPage;
