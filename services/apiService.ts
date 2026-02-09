@@ -1,4 +1,3 @@
-
 import { Role, DashboardStats, ChapterMonthlyReport, EventReport, User, Region, District, Zone, Area, Chapter, EventType } from '../types';
 import { supabase } from './supabaseClient';
 
@@ -16,7 +15,9 @@ export const apiService = {
       const { data, error } = await supabase.auth.signUp({
           email,
           password: '123456', 
-          options: { persistSession: false }
+          options: { 
+            data: { is_managed: true } 
+          }
       });
       if (error) {
           if (error.message.toLowerCase().includes('already registered')) throw new Error("ALREADY_EXISTS");

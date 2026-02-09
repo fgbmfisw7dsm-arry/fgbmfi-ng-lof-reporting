@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import ReportTable from './ReportTable';
 import { ChapterMonthlyReport, Role, EventReport, Region, District, Zone, Area, Chapter } from '../../types';
@@ -150,6 +149,12 @@ const ReportsPage: React.FC = () => {
                  currentScopeRole = Role.REGIONAL_VICE_PRESIDENT;
                  currentScopeName = "Regional Events";
                  break;
+            case Role.CHAPTER_PRESIDENT:
+                 groupBy = 'none' as any;
+                 currentScopeUnitId = user.unitId;
+                 currentScopeRole = Role.CHAPTER_PRESIDENT;
+                 currentScopeName = "Chapter Events";
+                 break;
             default:
                  groupBy = 'region';
                  nextLevelUnits = orgRegistry.regions;
@@ -176,8 +181,9 @@ const ReportsPage: React.FC = () => {
     // 1. Current Scope Summary (Direct events for this unit level)
     if (currentScopeUnitId && currentScopeRole) {
          const scopeEvents = eventReports.filter(r => r.unitId === currentScopeUnitId);
-         const cpReports = (currentScopeRole === Role.CHAPTER_PRESIDENT) ? reports.filter(r => r.chapterId === currentScopeUnitId) : [];
-         if (scopeEvents.length > 0 || cpReports.length > 0 || (nextLevelUnits.length > 0 && currentScopeRole !== Role.CHAPTER_PRESIDENT)) {
+         // Explicitly cast currentScopeRole to bypass narrowed-type comparison error
+         const cpReports = ((currentScopeRole as Role) === Role.CHAPTER_PRESIDENT) ? reports.filter(r => r.chapterId === currentScopeUnitId) : [];
+         if (scopeEvents.length > 0 || cpReports.length > 0 || (nextLevelUnits.length > 0 && (currentScopeRole as Role) !== Role.CHAPTER_PRESIDENT)) {
             rows.push({ id: `scope-${currentScopeUnitId}`, name: currentScopeName, ...sumData(scopeEvents.reduce(sumData, identity), cpReports.reduce(sumData, identity)) });
          }
     }

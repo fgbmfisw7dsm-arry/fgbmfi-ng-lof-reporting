@@ -6,7 +6,7 @@ interface ChartProps {
   type: 'line' | 'bar' | 'pie';
   data: { name: string; [key: string]: any }[];
   dataKey: string;
-  onSliceClick?: (slice: { name: string; [key: string]: any }) => void;
+  onSliceClick?: (slice: any) => void;
 }
 
 const SummaryChart: React.FC<ChartProps> = ({ title, type, data, dataKey, onSliceClick }) => {

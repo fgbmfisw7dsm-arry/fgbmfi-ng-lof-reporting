@@ -1,4 +1,3 @@
-
 import React, { useState, useContext, useEffect } from 'react';
 import { User, Role } from '../../../types';
 import { AuthContext } from '../../../context/AuthContext';
@@ -52,6 +51,7 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
             if (isNew) {
                 try {
                     const authUser = await apiService.createNewUserAuth(userToSave.email);
+                    if (!authUser) throw new Error("Could not create cloud authentication record.");
                     finalUserId = authUser.id;
                 } catch (authErr: any) {
                     if (authErr.message === "ALREADY_EXISTS") {
