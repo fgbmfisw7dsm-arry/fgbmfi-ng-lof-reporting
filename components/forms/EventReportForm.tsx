@@ -1,4 +1,3 @@
-
 import React, { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../../context/AuthContext';
 import { apiService } from '../../services/apiService';
@@ -59,12 +58,24 @@ const EventReportForm: React.FC = () => {
         unitId: user.unitId,
         officerRole: user.role,
       };
+      
       await apiService.submitEventReport(reportData);
+      
       setMessage('Event outcome submitted and synced with cloud!');
-      setFormData(prev => ({ ...prev, attendance: 0, firstTimers: 0, salvations: 0, holyGhostBaptism: 0, offering: 0, membershipIntention: 0 }));
-    } catch (error) {
-      setMessage('Submission failed. Please check your network connection.');
-      console.error(error);
+      // Reset numeric fields
+      setFormData(prev => ({ 
+        ...prev, 
+        attendance: 0, 
+        firstTimers: 0, 
+        salvations: 0, 
+        holyGhostBaptism: 0, 
+        offering: 0, 
+        membershipIntention: 0 
+      }));
+    } catch (error: any) {
+      const errorMsg = error.message || 'Submission failed. Please check your network connection.';
+      setMessage(`Sync Failed: ${errorMsg}`);
+      console.error("Submission Error:", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -122,7 +133,7 @@ const EventReportForm: React.FC = () => {
           </button>
         </div>
         {message && (
-            <div className={`mt-6 p-4 rounded-2xl text-xs font-bold text-center border ${message.includes('successfully') || message.includes('synced') ? 'bg-green-50 border-green-100 text-green-700' : 'bg-red-50 border-red-100 text-red-700'}`}>
+            <div className={`mt-6 p-4 rounded-2xl text-xs font-bold text-center border ${message.includes('synced') ? 'bg-green-50 border-green-100 text-green-700' : 'bg-red-50 border-red-100 text-red-700'}`}>
                 {message}
             </div>
         )}

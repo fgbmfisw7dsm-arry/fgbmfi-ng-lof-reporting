@@ -1,4 +1,3 @@
-
 import React, { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../../context/AuthContext';
 import { apiService } from '../../services/apiService';
@@ -64,8 +63,9 @@ const ChapterReportForm: React.FC = () => {
       await apiService.submitChapterReport(reportData);
       setMessage('Monthly report synced with cloud registry!');
       setFormData(prev => ({ ...prev, membershipCount: 0, attendance: 0, firstTimers: 0, salvations: 0, holyGhostBaptism: 0, membershipIntention: 0, offering: 0 }));
-    } catch (error) {
-      setMessage('Cloud sync failed. Verify your network and try again.');
+    } catch (error: any) {
+      const errorMsg = error.message || 'Cloud sync failed. Verify your network and try again.';
+      setMessage(`Sync Failed: ${errorMsg}`);
       console.error(error);
     } finally {
       setIsSubmitting(false);

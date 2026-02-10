@@ -98,25 +98,25 @@ const ReportsPage: React.FC = () => {
         nextLevelUnits = orgRegistry.chapters.filter(c => c.areaId === filters.areaId);
         currentScopeUnitId = filters.areaId;
         currentScopeRole = Role.FIELD_REPRESENTATIVE;
-        currentScopeName = "Area Events";
+        currentScopeName = "Area HQ Events";
     } else if (filters.zoneId) {
         groupBy = 'area';
         nextLevelUnits = orgRegistry.areas.filter(a => a.zoneId === filters.zoneId);
         currentScopeUnitId = filters.zoneId;
         currentScopeRole = Role.NATIONAL_DIRECTOR;
-        currentScopeName = "Zonal Events";
+        currentScopeName = "Zonal HQ Events";
     } else if (filters.districtId) {
         groupBy = 'zone';
         nextLevelUnits = orgRegistry.zones.filter(z => z.districtId === filters.districtId);
         currentScopeUnitId = filters.districtId;
         currentScopeRole = Role.DISTRICT_COORDINATOR;
-        currentScopeName = "District Events";
+        currentScopeName = "District HQ Events";
     } else if (filters.regionId) {
         groupBy = 'district';
         nextLevelUnits = orgRegistry.districts.filter(d => d.regionId === filters.regionId);
         currentScopeUnitId = filters.regionId;
         currentScopeRole = Role.REGIONAL_VICE_PRESIDENT;
-        currentScopeName = "Regional Events";
+        currentScopeName = "Regional HQ Events";
     } else if (user) {
         switch (user.role) {
             case Role.FIELD_REPRESENTATIVE:
@@ -124,14 +124,14 @@ const ReportsPage: React.FC = () => {
                  nextLevelUnits = orgRegistry.chapters.filter(c => c.areaId === user.unitId);
                  currentScopeUnitId = user.unitId;
                  currentScopeRole = Role.FIELD_REPRESENTATIVE;
-                 currentScopeName = "Area Events";
+                 currentScopeName = "Area HQ Events";
                  break;
             case Role.NATIONAL_DIRECTOR:
                  groupBy = 'area';
                  nextLevelUnits = orgRegistry.areas.filter(a => a.zoneId === user.unitId);
                  currentScopeUnitId = user.unitId;
                  currentScopeRole = Role.NATIONAL_DIRECTOR;
-                 currentScopeName = "Zonal Events";
+                 currentScopeName = "Zonal HQ Events";
                  break;
             case Role.DISTRICT_COORDINATOR:
             case Role.DISTRICT_ADMIN:
@@ -139,7 +139,7 @@ const ReportsPage: React.FC = () => {
                  nextLevelUnits = orgRegistry.zones.filter(z => z.districtId === user.unitId);
                  currentScopeUnitId = user.unitId;
                  currentScopeRole = Role.DISTRICT_COORDINATOR;
-                 currentScopeName = "District Events";
+                 currentScopeName = "District HQ Events";
                  break;
             case Role.REGIONAL_VICE_PRESIDENT:
             case Role.REGIONAL_ADMIN:
@@ -147,7 +147,7 @@ const ReportsPage: React.FC = () => {
                  nextLevelUnits = orgRegistry.districts.filter(d => d.regionId === user.unitId);
                  currentScopeUnitId = user.unitId;
                  currentScopeRole = Role.REGIONAL_VICE_PRESIDENT;
-                 currentScopeName = "Regional Events";
+                 currentScopeName = "Regional HQ Events";
                  break;
             case Role.CHAPTER_PRESIDENT:
                  groupBy = 'none' as any;
@@ -160,10 +160,13 @@ const ReportsPage: React.FC = () => {
                  nextLevelUnits = orgRegistry.regions;
                  currentScopeUnitId = 'national';
                  currentScopeRole = Role.NATIONAL_PRESIDENT;
-                 currentScopeName = "National Events";
+                 currentScopeName = "National HQ Events";
                  break;
         }
     }
+
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+    nextLevelUnits.sort((a, b) => collator.compare(a.name, b.name));
     
     const sumData = (acc: any, curr: any) => ({
         membershipCount: (acc.membershipCount || 0) + (curr.membershipCount || 0),
@@ -177,38 +180,38 @@ const ReportsPage: React.FC = () => {
     const identity = { membershipCount: 0, attendance: 0, firstTimers: 0, salvations: 0, holyGhostBaptism: 0, membershipIntention: 0, offering: 0 };
 
     const rows: any[] = [];
+    const normalizedScopeUnitId = currentScopeUnitId?.trim().toUpperCase();
 
-    // 1. Current Scope Summary (Direct events for this unit level)
-    if (currentScopeUnitId && currentScopeRole) {
-         const scopeEvents = eventReports.filter(r => r.unitId === currentScopeUnitId);
-         // Explicitly cast currentScopeRole to bypass narrowed-type comparison error
-         const cpReports = ((currentScopeRole as Role) === Role.CHAPTER_PRESIDENT) ? reports.filter(r => r.chapterId === currentScopeUnitId) : [];
+    if (normalizedScopeUnitId && currentScopeRole) {
+         const scopeEvents = eventReports.filter(r => r.unitId.trim().toUpperCase() === normalizedScopeUnitId);
+         const cpReports = ((currentScopeRole as Role) === Role.CHAPTER_PRESIDENT) ? reports.filter(r => r.chapterId.trim().toUpperCase() === normalizedScopeUnitId) : [];
          if (scopeEvents.length > 0 || cpReports.length > 0 || (nextLevelUnits.length > 0 && (currentScopeRole as Role) !== Role.CHAPTER_PRESIDENT)) {
-            rows.push({ id: `scope-${currentScopeUnitId}`, name: currentScopeName, ...sumData(scopeEvents.reduce(sumData, identity), cpReports.reduce(sumData, identity)) });
+            rows.push({ id: `scope-${normalizedScopeUnitId}`, name: currentScopeName, ...sumData(scopeEvents.reduce(sumData, identity), cpReports.reduce(sumData, identity)) });
          }
     }
 
-    // 2. Child Units Rollup
     nextLevelUnits.forEach(unit => {
+        const normUnitId = unit.id.trim().toUpperCase();
         const descendantChapterIds: string[] = [];
-        const descendantUnitIds: string[] = [unit.id]; 
+        const descendantUnitIds: string[] = [normUnitId]; 
 
         const localFind = (currId: string) => {
-            orgRegistry.districts.filter(d => d.regionId === currId).forEach(d => { descendantUnitIds.push(d.id); localFind(d.id); });
-            orgRegistry.zones.filter(z => z.districtId === currId).forEach(z => { descendantUnitIds.push(z.id); localFind(z.id); });
-            orgRegistry.areas.filter(a => a.zoneId === currId).forEach(a => { descendantUnitIds.push(a.id); localFind(a.id); });
-            orgRegistry.chapters.filter(c => c.areaId === currId).forEach(c => { descendantChapterIds.push(c.id); descendantUnitIds.push(c.id); });
+            const nc = currId.trim().toUpperCase();
+            orgRegistry.districts.filter(d => d.regionId.trim().toUpperCase() === nc).forEach(d => { descendantUnitIds.push(d.id.trim().toUpperCase()); localFind(d.id); });
+            orgRegistry.zones.filter(z => z.districtId.trim().toUpperCase() === nc).forEach(z => { descendantUnitIds.push(z.id.trim().toUpperCase()); localFind(z.id); });
+            orgRegistry.areas.filter(a => a.zoneId.trim().toUpperCase() === nc).forEach(a => { descendantUnitIds.push(a.id.trim().toUpperCase()); localFind(a.id); });
+            orgRegistry.chapters.filter(c => c.areaId.trim().toUpperCase() === nc).forEach(c => { descendantChapterIds.push(c.id.trim().toUpperCase()); descendantUnitIds.push(c.id.trim().toUpperCase()); });
         };
         
         if (groupBy === 'chapter') {
-            descendantChapterIds.push(unit.id);
-            descendantUnitIds.push(unit.id);
+            descendantChapterIds.push(normUnitId);
+            descendantUnitIds.push(normUnitId);
         } else {
             localFind(unit.id);
         }
         
-        const unitReports = reports.filter(r => descendantChapterIds.includes(r.chapterId));
-        const unitEvents = eventReports.filter(r => descendantUnitIds.includes(r.unitId)); 
+        const unitReports = reports.filter(r => descendantChapterIds.includes(r.chapterId.trim().toUpperCase()));
+        const unitEvents = eventReports.filter(r => descendantUnitIds.includes(r.unitId.trim().toUpperCase())); 
         
         const unitSum = sumData(unitReports.reduce(sumData, identity), unitEvents.reduce(sumData, identity));
         rows.push({ id: unit.id, name: unit.name, ...unitSum });

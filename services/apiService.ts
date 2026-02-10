@@ -133,37 +133,62 @@ export const apiService = {
   deleteEventType: (id: string) => supabase.from('event_types').delete().eq('id', id),
 
   getAllDescendantIds: async (unitId: string): Promise<{ descendantIds: string[], chapterIds: string[] }> => {
-    if (unitId === 'national') {
-      const [chaps] = await Promise.all([supabase.from('chapters').select('id').limit(REGISTRY_LIMIT)]);
-      return { descendantIds: ['national'], chapterIds: (chaps.data as any[])?.map(c => c.id) || [] };
+    const normalizedUnitId = unitId.trim().toUpperCase();
+
+    if (normalizedUnitId === 'NATIONAL') {
+      const [regs, dists, zones, areas, chaps] = await Promise.all([
+        supabase.from('regions').select('id').limit(REGISTRY_LIMIT),
+        supabase.from('districts').select('id').limit(REGISTRY_LIMIT),
+        supabase.from('zones').select('id').limit(REGISTRY_LIMIT),
+        supabase.from('areas').select('id').limit(REGISTRY_LIMIT),
+        supabase.from('chapters').select('id').limit(REGISTRY_LIMIT)
+      ]);
+
+      const allDescendants = [
+        'NATIONAL',
+        ...(regs.data || []).map((r: any) => r.id.trim().toUpperCase()),
+        ...(dists.data || []).map((d: any) => d.id.trim().toUpperCase()),
+        ...(zones.data || []).map((z: any) => z.id.trim().toUpperCase()),
+        ...(areas.data || []).map((a: any) => a.id.trim().toUpperCase()),
+        ...(chaps.data || []).map((c: any) => c.id.trim().toUpperCase())
+      ];
+
+      return { 
+        descendantIds: Array.from(new Set(allDescendants)), 
+        chapterIds: (chaps.data || []).map((c: any) => c.id.trim().toUpperCase()) 
+      };
     }
+
     const [dists, zones, areas, chaps] = await Promise.all([
       supabase.from('districts').select('id, region_id').limit(REGISTRY_LIMIT),
       supabase.from('zones').select('id, district_id').limit(REGISTRY_LIMIT),
       supabase.from('areas').select('id, zone_id').limit(REGISTRY_LIMIT),
       supabase.from('chapters').select('id, area_id').limit(REGISTRY_LIMIT)
     ]);
-    const descendantIds: string[] = [unitId];
+
+    const descendantIds: string[] = [normalizedUnitId];
     const chapterIds: string[] = [];
+    
     const crawl = (currId: string) => {
-      (dists.data as any[])?.filter(d => d.region_id === currId).forEach(d => { descendantIds.push(d.id); crawl(d.id); });
-      (zones.data as any[])?.filter(z => z.district_id === currId).forEach(z => { descendantIds.push(z.id); crawl(z.id); });
-      (areas.data as any[])?.filter(a => a.zone_id === currId).forEach(a => { descendantIds.push(a.id); crawl(a.id); });
-      (chaps.data as any[])?.filter(c => c.area_id === currId).forEach(c => { descendantIds.push(c.id); chapterIds.push(c.id); });
+      const normCurr = currId.trim().toUpperCase();
+      (dists.data as any[])?.filter(d => d.region_id.trim().toUpperCase() === normCurr).forEach(d => { descendantIds.push(d.id.trim().toUpperCase()); crawl(d.id); });
+      (zones.data as any[])?.filter(z => z.district_id.trim().toUpperCase() === normCurr).forEach(z => { descendantIds.push(z.id.trim().toUpperCase()); crawl(z.id); });
+      (areas.data as any[])?.filter(a => a.zone_id.trim().toUpperCase() === normCurr).forEach(a => { descendantIds.push(a.id.trim().toUpperCase()); crawl(a.id); });
+      (chaps.data as any[])?.filter(c => c.area_id.trim().toUpperCase() === normCurr).forEach(c => { descendantIds.push(c.id.trim().toUpperCase()); chapterIds.push(c.id.trim().toUpperCase()); });
     };
+
     crawl(unitId);
-    if ((chaps.data as any[])?.some(c => c.id === unitId) && !chapterIds.includes(unitId)) chapterIds.push(unitId);
-    return { descendantIds, chapterIds };
+    if ((chaps.data as any[])?.some(c => c.id.trim().toUpperCase() === normalizedUnitId)) {
+        chapterIds.push(normalizedUnitId);
+    }
+    
+    return { descendantIds: Array.from(new Set(descendantIds)), chapterIds: Array.from(new Set(chapterIds)) };
   },
 
   getDashboardData: async (role: Role, unitId: string): Promise<DashboardStats> => {
     const year = new Date().getFullYear();
-    const { descendantIds, chapterIds } = await apiService.getAllDescendantIds(unitId);
-
-    let officerQ = supabase.from('profiles').select('id').limit(REGISTRY_LIMIT);
-    if (unitId !== 'national') officerQ = officerQ.in('unit_id', descendantIds);
-    const { data: profiles } = await officerQ;
-    const officerIds = (profiles as any[])?.map(p => p.id) || [];
+    const normalizedUnitId = unitId.trim().toUpperCase();
+    const { descendantIds, chapterIds } = await apiService.getAllDescendantIds(normalizedUnitId);
 
     const results = await Promise.all([
         apiService.getRegions(),
@@ -172,7 +197,7 @@ export const apiService = {
         apiService.getAreas(),
         apiService.getChapters(),
         supabase.from('chapter_reports').select('*').in('chapter_id', chapterIds).eq('year', year).limit(REGISTRY_LIMIT),
-        supabase.from('event_reports').select('*').in('reporting_officer_id', officerIds).gte('date_of_event', `${year}-01-01`).lte('date_of_event', `${year}-12-31`).limit(REGISTRY_LIMIT)
+        supabase.from('event_reports').select('*').in('unit_id', descendantIds).gte('date_of_event', `${year}-01-01`).lte('date_of_event', `${year}-12-31`).limit(REGISTRY_LIMIT)
     ]);
 
     const regs = results[0] as Region[];
@@ -180,20 +205,17 @@ export const apiService = {
     const zones = results[2] as Zone[];
     const areas = results[3] as Area[];
     const chaps = results[4] as Chapter[];
-    const allMonthly = results[5] as any;
-    const allEvents = results[6] as any;
-
-    const filteredMonthly = (allMonthly.data as any[]) || [];
-    const filteredEvents = (allEvents.data as any[]) || [];
+    const allMonthly = (results[5].data as any[]) || [];
+    const allEvents = (results[6].data as any[]) || [];
 
     const stats = { totalAttendance: 0, totalFirstTimers: 0, totalSalvations: 0, totalHolyGhostBaptisms: 0, totalOfferings: 0, totalMembershipCount: 0, totalMembershipIntentions: 0 };
-    filteredMonthly.forEach(r => {
+    allMonthly.forEach(r => {
         stats.totalAttendance += (r.attendance || 0); stats.totalFirstTimers += (r.first_timers || 0);
         stats.totalSalvations += (r.salvations || 0); stats.totalHolyGhostBaptisms += (r.holy_ghost_baptism || 0);
         stats.totalOfferings += Number(r.offering || 0); stats.totalMembershipCount += (r.membership_count || 0);
         stats.totalMembershipIntentions += (r.membership_intention || 0);
     });
-    filteredEvents.forEach(r => {
+    allEvents.forEach(r => {
         stats.totalAttendance += (r.attendance || 0); stats.totalFirstTimers += (r.first_timers || 0);
         stats.totalSalvations += (r.salvations || 0); stats.totalHolyGhostBaptisms += (r.holy_ghost_baptism || 0);
         stats.totalOfferings += Number(r.offering || 0); stats.totalMembershipIntentions += (r.membership_intention || 0);
@@ -202,54 +224,55 @@ export const apiService = {
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const growthTrend = months.map(m => ({ 
         name: m.substring(0, 3), 
-        value: (filteredMonthly.filter(r => r.month === m).reduce((sum, r) => sum + (r.attendance || 0), 0) || 0) +
-               (filteredEvents.filter(r => new Date(r.date_of_event).toLocaleString('default', { month: 'long' }) === m).reduce((sum, r) => sum + (r.attendance || 0), 0) || 0)
+        value: (allMonthly.filter(r => r.month === m).reduce((sum, r) => sum + (r.attendance || 0), 0) || 0) +
+               (allEvents.filter(r => new Date(r.date_of_event).toLocaleString('default', { month: 'long' }) === m).reduce((sum, r) => sum + (r.attendance || 0), 0) || 0)
     }));
 
-    const { data: allProfiles } = await supabase.from('profiles').select('id, unit_id').limit(REGISTRY_LIMIT);
-    const officerToUnitMap = new Map<string, string>((allProfiles as any[] || []).map(p => [p.id as string, p.unit_id as string]));
-
     const breakdown: any[] = [];
-    
-    // Add current Office contribution to breakdown
     const getOfficeLabel = (r: Role) => {
-        if (r === Role.NATIONAL_PRESIDENT) return "National Events";
-        if (r === Role.REGIONAL_VICE_PRESIDENT) return "Regional Events";
-        if (r === Role.DISTRICT_COORDINATOR) return "District Events";
-        if (r === Role.NATIONAL_DIRECTOR) return "Zonal Events";
-        if (r === Role.FIELD_REPRESENTATIVE) return "Area Events";
+        if (r === Role.NATIONAL_PRESIDENT || r === Role.NATIONAL_ADMIN) return "National HQ Events";
+        if (r === Role.REGIONAL_VICE_PRESIDENT || r === Role.REGIONAL_ADMIN) return "Regional HQ Events";
+        if (r === Role.DISTRICT_COORDINATOR || r === Role.DISTRICT_ADMIN) return "District HQ Events";
+        if (r === Role.NATIONAL_DIRECTOR) return "Zonal HQ Events";
+        if (r === Role.FIELD_REPRESENTATIVE) return "Area HQ Events";
         return "Office Events";
     };
 
-    const directOfficeEvents = filteredEvents.filter(r => officerToUnitMap.get(r.reporting_officer_id) === unitId);
+    const directOfficeEvents = allEvents.filter(r => r.unit_id.trim().toUpperCase() === normalizedUnitId);
     const directOfficeTotal = directOfficeEvents.reduce((sum, r) => sum + (r.attendance || 0), 0);
     if (directOfficeTotal > 0 && role !== Role.CHAPTER_PRESIDENT) {
-        breakdown.push({ name: getOfficeLabel(role), value: directOfficeTotal, unitId: unitId, role: role });
+        breakdown.push({ name: getOfficeLabel(role), value: directOfficeTotal, unitId: normalizedUnitId, role: role });
     }
 
-    const getUnitTotals = (targetUnitId: string) => {
-        const targetChapterIds: string[] = [];
-        const targetDescendantIds: string[] = [targetUnitId];
-        const localFind = (currId: string) => {
-            (dists as any[]).filter(d => d.regionId === currId).forEach(d => { targetDescendantIds.push(d.id); localFind(d.id); });
-            (zones as any[]).filter(z => z.districtId === currId).forEach(z => { targetDescendantIds.push(z.id); localFind(z.id); });
-            (areas as any[]).filter(a => a.zoneId === currId).forEach(a => { targetDescendantIds.push(a.id); localFind(a.id); });
-            (chaps as any[]).filter(c => c.areaId === currId).forEach(c => { targetChapterIds.push(c.id); targetDescendantIds.push(c.id); });
+    const getUnitTotals = (targetId: string) => {
+        const normTarget = targetId.trim().toUpperCase();
+        const targetDescendants: string[] = [normTarget];
+        const targetChapters: string[] = [];
+        const localCrawl = (curr: string) => {
+            const nc = curr.trim().toUpperCase();
+            (dists as any[]).filter(d => d.regionId.trim().toUpperCase() === nc).forEach(d => { targetDescendants.push(d.id.trim().toUpperCase()); localCrawl(d.id); });
+            (zones as any[]).filter(z => z.districtId.trim().toUpperCase() === nc).forEach(z => { targetDescendants.push(z.id.trim().toUpperCase()); localCrawl(z.id); });
+            (areas as any[]).filter(a => a.zoneId.trim().toUpperCase() === nc).forEach(a => { targetDescendants.push(a.id.trim().toUpperCase()); localCrawl(a.id); });
+            (chaps as any[]).filter(c => c.areaId.trim().toUpperCase() === nc).forEach(c => { targetDescendants.push(c.id.trim().toUpperCase()); targetChapters.push(c.id.trim().toUpperCase()); });
         };
-        if (chaps.some(c => c.id === targetUnitId)) targetChapterIds.push(targetUnitId);
-        else localFind(targetUnitId);
-        
-        return (filteredMonthly.filter(r => targetChapterIds.includes(r.chapter_id)).reduce((sum, r) => sum + (r.attendance || 0), 0) || 0) +
-               (filteredEvents.filter(r => targetDescendantIds.includes(officerToUnitMap.get(r.reporting_officer_id) || '')).reduce((sum, r) => sum + (r.attendance || 0), 0) || 0);
+        if (chaps.some(c => c.id.trim().toUpperCase() === normTarget)) targetChapters.push(normTarget);
+        else localCrawl(targetId);
+        const mTotal = allMonthly.filter(r => targetChapters.includes(r.chapter_id.trim().toUpperCase())).reduce((sum, r) => sum + (r.attendance || 0), 0);
+        const eTotal = allEvents.filter(r => targetDescendants.includes(r.unit_id.trim().toUpperCase())).reduce((sum, r) => sum + (r.attendance || 0), 0);
+        return mTotal + eTotal;
     };
 
-    if (unitId === 'national') { regs.forEach(r => breakdown.push({ name: r.name, value: getUnitTotals(r.id), unitId: r.id, role: Role.REGIONAL_VICE_PRESIDENT })); }
-    else if (role === Role.REGIONAL_VICE_PRESIDENT || role === Role.REGIONAL_ADMIN) { dists.filter(d => d.regionId === unitId).forEach(d => breakdown.push({ name: d.name, value: getUnitTotals(d.id), unitId: d.id, role: Role.DISTRICT_COORDINATOR })); }
-    else if (role === Role.DISTRICT_COORDINATOR || role === Role.DISTRICT_ADMIN) { zones.filter(z => z.districtId === unitId).forEach(z => breakdown.push({ name: z.name, value: getUnitTotals(z.id), unitId: z.id, role: Role.NATIONAL_DIRECTOR })); }
-    else if (role === Role.NATIONAL_DIRECTOR) { areas.filter(a => a.zoneId === unitId).forEach(a => breakdown.push({ name: a.name, value: getUnitTotals(a.id), unitId: a.id, role: Role.FIELD_REPRESENTATIVE })); }
-    else if (role === Role.FIELD_REPRESENTATIVE) { chaps.filter(c => c.areaId === unitId).forEach(c => breakdown.push({ name: c.name, value: getUnitTotals(c.id), unitId: c.id, role: Role.CHAPTER_PRESIDENT })); }
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+    const subUnitsBreakdown: any[] = [];
+    if (normalizedUnitId === 'NATIONAL') { regs.forEach(r => subUnitsBreakdown.push({ name: r.name, value: getUnitTotals(r.id), unitId: r.id, role: Role.REGIONAL_VICE_PRESIDENT })); }
+    else if (role === Role.REGIONAL_VICE_PRESIDENT || role === Role.REGIONAL_ADMIN) { dists.filter(d => d.regionId.trim().toUpperCase() === normalizedUnitId).forEach(d => subUnitsBreakdown.push({ name: d.name, value: getUnitTotals(d.id), unitId: d.id, role: Role.DISTRICT_COORDINATOR })); }
+    else if (role === Role.DISTRICT_COORDINATOR || role === Role.DISTRICT_ADMIN) { zones.filter(z => z.districtId.trim().toUpperCase() === normalizedUnitId).forEach(z => subUnitsBreakdown.push({ name: z.name, value: getUnitTotals(z.id), unitId: z.id, role: Role.NATIONAL_DIRECTOR })); }
+    else if (role === Role.NATIONAL_DIRECTOR) { areas.filter(a => a.zoneId.trim().toUpperCase() === normalizedUnitId).forEach(a => subUnitsBreakdown.push({ name: a.name, value: getUnitTotals(a.id), unitId: a.id, role: Role.FIELD_REPRESENTATIVE })); }
+    else if (role === Role.FIELD_REPRESENTATIVE) { chaps.filter(c => c.areaId.trim().toUpperCase() === normalizedUnitId).forEach(c => subUnitsBreakdown.push({ name: c.name, value: getUnitTotals(c.id), unitId: c.id, role: Role.CHAPTER_PRESIDENT })); }
 
-    return { ...stats, growthTrend, breakdown: breakdown.filter(b => b.value > 0) };
+    subUnitsBreakdown.sort((a, b) => collator.compare(a.name, b.name));
+    const finalBreakdown = [...breakdown, ...subUnitsBreakdown].filter(b => b.value > 0);
+    return { ...stats, growthTrend, breakdown: finalBreakdown };
   },
 
   getChapterReports: async (f: any, user?: User) => {
@@ -268,30 +291,17 @@ export const apiService = {
   getEventReports: async (f: any, user?: User) => {
     const targetUnitId = f.chapterId || f.areaId || f.zoneId || f.districtId || f.regionId || user?.unitId;
     if (!targetUnitId) return [];
-
     const { descendantIds } = await apiService.getAllDescendantIds(targetUnitId);
-    
-    // We need to fetch profiles to know WHICH unit each event belongs to for grouping in reports
-    const { data: allProfiles } = await supabase.from('profiles').select('id, unit_id').limit(REGISTRY_LIMIT);
-    const officerToUnitMap = new Map<string, string>((allProfiles as any[] || []).map(p => [p.id, p.unit_id]));
-    
-    // Filter officer IDs based on whether their unit is within the target scope
-    const officerIds = (allProfiles as any[])
-        ?.filter(p => targetUnitId === 'national' || descendantIds.includes(p.unit_id))
-        .map(p => p.id) || [];
-
     let q = supabase.from('event_reports').select('*').limit(REGISTRY_LIMIT);
-    if (officerIds.length > 0) q = q.in('reporting_officer_id', officerIds);
-    else q = q.eq('reporting_officer_id', 'NONE');
-    
+    if (descendantIds.length > 0) q = q.in('unit_id', descendantIds);
+    else q = q.eq('unit_id', 'NONE');
     if (f.startDate) q = q.gte('date_of_event', f.startDate);
     if (f.endDate) q = q.lte('date_of_event', f.endDate);
-    
     const { data } = await q.order('date_of_event', { ascending: false });
     return (data || []).map(r => ({ 
         id: r.id, 
         reportingOfficerId: r.reporting_officer_id, 
-        unitId: officerToUnitMap.get(r.reporting_officer_id) || '', // Inject unitId for Reports portal aggregation
+        unitId: r.unit_id, 
         officerRole: r.officer_role as Role, 
         dateOfEvent: r.date_of_event, 
         eventType: r.event_type, 
@@ -306,14 +316,44 @@ export const apiService = {
 
   archiveReportsByScope: async (scope: any, unitId: string, fromYear: number, toYear: number) => ({ success: true }),
   deleteReportsByScope: async (scope: any, unitId: string, fromYear: number, toYear: number) => {
-      const { chapterIds, descendantIds } = await apiService.getAllDescendantIds(unitId);
+      const { descendantIds, chapterIds } = await apiService.getAllDescendantIds(unitId);
       if (chapterIds.length > 0) await supabase.from('chapter_reports').delete().in('chapter_id', chapterIds).gte('year', fromYear).lte('year', toYear);
-      const { data: profiles } = await supabase.from('profiles').select('id').in('unit_id', descendantIds).limit(REGISTRY_LIMIT);
-      const officerIds = (profiles as any[])?.map(p => p.id) || [];
-      if (officerIds.length > 0) await supabase.from('event_reports').delete().in('reporting_officer_id', officerIds).gte('date_of_event', `${fromYear}-01-01`).lte('date_of_event', `${toYear}-12-31`);
+      if (descendantIds.length > 0) await supabase.from('event_reports').delete().in('unit_id', descendantIds).gte('date_of_event', `${fromYear}-01-01`).lte('date_of_event', `${toYear}-12-31`);
       return { success: true };
   },
-  submitChapterReport: (r: any) => supabase.from('chapter_reports').insert({ chapter_id: r.chapterId, month: r.month, year: r.year, membership_count: r.membership_count, attendance: r.attendance, first_timers: r.first_timers, salvations: r.salvations, holy_ghost_baptism: r.holy_ghost_baptism, membership_intention: r.membership_intention, offering: r.offering }),
-  submitEventReport: (r: any) => supabase.from('event_reports').insert({ reporting_officer_id: r.reportingOfficerId, officer_role: r.officer_role, date_of_event: r.dateOfEvent, event_type: r.eventType, attendance: r.attendance, first_timers: r.first_timers, salvations: r.salvations, holy_ghost_baptism: r.holy_ghost_baptism, membership_intention: r.membership_intention, offering: r.offering }),
+
+  submitChapterReport: async (r: any) => {
+    const { error } = await supabase.from('chapter_reports').insert({ 
+        chapter_id: r.chapterId.trim().toUpperCase(), 
+        month: r.month, 
+        year: r.year, 
+        membership_count: r.membershipCount, 
+        attendance: r.attendance, 
+        first_timers: r.first_timers, 
+        salvations: r.salvations, 
+        holy_ghost_baptism: r.holy_ghost_baptism, 
+        membership_intention: r.membership_intention, 
+        offering: r.offering 
+    });
+    if (error) throw error;
+  },
+
+  submitEventReport: async (r: any) => {
+    const { error } = await supabase.from('event_reports').insert({ 
+        reporting_officer_id: r.reportingOfficerId, 
+        unit_id: r.unitId.trim().toUpperCase(), 
+        officer_role: r.officerRole, 
+        date_of_event: r.dateOfEvent, 
+        event_type: r.eventType, 
+        attendance: r.attendance, 
+        first_timers: r.first_timers, 
+        salvations: r.salvations, 
+        holy_ghost_baptism: r.holy_ghost_baptism, 
+        membership_intention: r.membership_intention, 
+        offering: r.offering 
+    });
+    if (error) throw error;
+  },
+
   clearAllData: () => Promise.all([supabase.from('chapter_reports').delete().neq('id', '0'), supabase.from('event_reports').delete().neq('id', '0')])
 };
