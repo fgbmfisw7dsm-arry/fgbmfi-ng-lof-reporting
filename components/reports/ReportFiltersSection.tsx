@@ -20,13 +20,14 @@ export const ReportFiltersSection: React.FC<FilterProps> = ({ filters, handleFil
   const [areas, setAreas] = useState<Area[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
 
-  // Calculate Lock State
+  // Calculate Lock State - Ensure strictly boolean to satisfy TS2322
   const isNational = user?.unitId.trim().toUpperCase() === 'NATIONAL';
-  const lockRegion = user && [Role.REGIONAL_VICE_PRESIDENT, Role.REGIONAL_ADMIN, Role.DISTRICT_COORDINATOR, Role.DISTRICT_ADMIN, Role.NATIONAL_DIRECTOR, Role.FIELD_REPRESENTATIVE, Role.CHAPTER_PRESIDENT].includes(user.role);
-  const lockDistrict = user && [Role.DISTRICT_COORDINATOR, Role.DISTRICT_ADMIN, Role.NATIONAL_DIRECTOR, Role.FIELD_REPRESENTATIVE, Role.CHAPTER_PRESIDENT].includes(user.role);
-  const lockZone = user && [Role.NATIONAL_DIRECTOR, Role.FIELD_REPRESENTATIVE, Role.CHAPTER_PRESIDENT].includes(user.role);
-  const lockArea = user && [Role.FIELD_REPRESENTATIVE, Role.CHAPTER_PRESIDENT].includes(user.role);
-  const lockChapter = user && [Role.CHAPTER_PRESIDENT].includes(user.role);
+  
+  const lockRegion = user ? [Role.REGIONAL_VICE_PRESIDENT, Role.REGIONAL_ADMIN, Role.DISTRICT_COORDINATOR, Role.DISTRICT_ADMIN, Role.NATIONAL_DIRECTOR, Role.FIELD_REPRESENTATIVE, Role.CHAPTER_PRESIDENT].includes(user.role) : false;
+  const lockDistrict = user ? [Role.DISTRICT_COORDINATOR, Role.DISTRICT_ADMIN, Role.NATIONAL_DIRECTOR, Role.FIELD_REPRESENTATIVE, Role.CHAPTER_PRESIDENT].includes(user.role) : false;
+  const lockZone = user ? [Role.NATIONAL_DIRECTOR, Role.FIELD_REPRESENTATIVE, Role.CHAPTER_PRESIDENT].includes(user.role) : false;
+  const lockArea = user ? [Role.FIELD_REPRESENTATIVE, Role.CHAPTER_PRESIDENT].includes(user.role) : false;
+  const lockChapter = user ? [Role.CHAPTER_PRESIDENT].includes(user.role) : false;
 
   useEffect(() => {
     apiService.getRegions().then(data => setRegions(sortByName(data))).catch(err => console.error("Filter Region Load Failed:", err));
