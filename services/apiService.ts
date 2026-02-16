@@ -276,8 +276,17 @@ export const apiService = {
   },
 
   getChapterReports: async (f: any, user?: User) => {
-    const targetUnitId = f.chapterId || f.areaId || f.zoneId || f.districtId || f.regionId || user?.unitId;
+    let targetUnitId = f.chapterId || f.areaId || f.zoneId || f.districtId || f.regionId || user?.unitId;
     if (!targetUnitId) return [];
+    
+    // SECURITY: Ensure targetUnitId is within user's downward scope
+    if (user && user.unitId.trim().toUpperCase() !== 'NATIONAL') {
+        const authorized = await apiService.getAllDescendantIds(user.unitId);
+        if (!authorized.descendantIds.includes(targetUnitId.trim().toUpperCase())) {
+            targetUnitId = user.unitId; // Override unauthorized selection
+        }
+    }
+
     const { chapterIds } = await apiService.getAllDescendantIds(targetUnitId);
     let q = supabase.from('chapter_reports').select('*').limit(REGISTRY_LIMIT);
     if (chapterIds.length > 0) q = q.in('chapter_id', chapterIds);
@@ -289,8 +298,17 @@ export const apiService = {
   },
 
   getEventReports: async (f: any, user?: User) => {
-    const targetUnitId = f.chapterId || f.areaId || f.zoneId || f.districtId || f.regionId || user?.unitId;
+    let targetUnitId = f.chapterId || f.areaId || f.zoneId || f.districtId || f.regionId || user?.unitId;
     if (!targetUnitId) return [];
+
+    // SECURITY: Ensure targetUnitId is within user's downward scope
+    if (user && user.unitId.trim().toUpperCase() !== 'NATIONAL') {
+        const authorized = await apiService.getAllDescendantIds(user.unitId);
+        if (!authorized.descendantIds.includes(targetUnitId.trim().toUpperCase())) {
+            targetUnitId = user.unitId; // Override unauthorized selection
+        }
+    }
+
     const { descendantIds } = await apiService.getAllDescendantIds(targetUnitId);
     let q = supabase.from('event_reports').select('*').limit(REGISTRY_LIMIT);
     if (descendantIds.length > 0) q = q.in('unit_id', descendantIds);

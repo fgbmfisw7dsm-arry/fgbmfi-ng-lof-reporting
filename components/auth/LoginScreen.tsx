@@ -1,10 +1,11 @@
-
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import { AuthContext } from '../../context/AuthContext';
 import Icon from '../ui/Icon';
 import { LOGO_BASE64, ROLES } from '../../constants';
 import { apiService } from '../../services/apiService';
 import { Role } from '../../types';
+
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 const LoginScreen: React.FC = () => {
   const [identifier, setIdentifier] = useState('');
@@ -76,9 +77,13 @@ const LoginScreen: React.FC = () => {
   };
 
   const handleResetConnection = () => {
+    handleClearLocalStorage();
+    window.location.reload();
+  };
+
+  const handleClearLocalStorage = () => {
     localStorage.clear();
     sessionStorage.clear();
-    window.location.reload();
   };
 
   const handleFinishOnboarding = async (e: React.FormEvent) => {
@@ -100,16 +105,18 @@ const LoginScreen: React.FC = () => {
   };
 
   const getAvailableUnits = () => {
+    let units: any[] = [];
     switch (onboardingData.role) {
-        case Role.CHAPTER_PRESIDENT: return orgData.chapters;
-        case Role.FIELD_REPRESENTATIVE: return orgData.areas;
-        case Role.NATIONAL_DIRECTOR: return orgData.zones;
+        case Role.CHAPTER_PRESIDENT: units = orgData.chapters; break;
+        case Role.FIELD_REPRESENTATIVE: units = orgData.areas; break;
+        case Role.NATIONAL_DIRECTOR: units = orgData.zones; break;
         case Role.DISTRICT_COORDINATOR:
-        case Role.DISTRICT_ADMIN: return orgData.districts;
+        case Role.DISTRICT_ADMIN: units = orgData.districts; break;
         case Role.REGIONAL_VICE_PRESIDENT:
-        case Role.REGIONAL_ADMIN: return orgData.regions;
+        case Role.REGIONAL_ADMIN: units = orgData.regions; break;
         default: return [{ id: 'national', name: 'National Headquarters' }];
     }
+    return [...units].sort((a, b) => collator.compare(a.name, b.name));
   };
 
   if (pendingProfileUser) {

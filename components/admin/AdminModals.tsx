@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, Role, Region, District, Zone, Area, Chapter, EventType } from '../../types';
 import { ROLES } from '../../constants';
@@ -7,6 +6,9 @@ import Icon from '../ui/Icon';
 type OrgUnit = Region | District | Zone | Area | Chapter;
 const inputClass = "mt-1 block w-full px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-fgbmfi-blue focus:border-transparent sm:text-sm transition-all font-bold";
 const disabledInputClass = "mt-1 block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl shadow-sm text-gray-400 cursor-not-allowed sm:text-sm font-bold";
+
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+const sortByName = (items: any[]) => [...items].sort((a, b) => collator.compare(a.name, b.name));
 
 export const ConfirmationModal: React.FC<{
     isOpen: boolean; onClose: () => void; onConfirm: () => void; title: string; message: string; confirmButtonText?: string; confirmButtonClass?: string;
@@ -100,7 +102,7 @@ export const OrgUnitFormModal: React.FC<{
                                 {parentMeta.disabled ? <option value="national">National HQ (Nigeria)</option> : (
                                     <>
                                         <option value="">-- Select Parent Unit --</option>
-                                        {potentialParents?.map(p => <option key={p.id} value={p.id}>{p.name} [{p.id}]</option>)}
+                                        {sortByName(potentialParents)?.map(p => <option key={p.id} value={p.id}>{p.name} [{p.id}]</option>)}
                                     </>
                                 )}
                             </select>
@@ -137,16 +139,18 @@ export const UserFormModal: React.FC<{
     if (!isOpen) return null;
 
     const getUnitOptions = () => {
+        let units: any[] = [];
         switch (formData.role) {
-            case Role.CHAPTER_PRESIDENT: return orgData.chapters;
-            case Role.FIELD_REPRESENTATIVE: return orgData.areas;
-            case Role.NATIONAL_DIRECTOR: return orgData.zones;
+            case Role.CHAPTER_PRESIDENT: units = orgData.chapters; break;
+            case Role.FIELD_REPRESENTATIVE: units = orgData.areas; break;
+            case Role.NATIONAL_DIRECTOR: units = orgData.zones; break;
             case Role.DISTRICT_COORDINATOR:
-            case Role.DISTRICT_ADMIN: return orgData.districts;
+            case Role.DISTRICT_ADMIN: units = orgData.districts; break;
             case Role.REGIONAL_VICE_PRESIDENT:
-            case Role.REGIONAL_ADMIN: return orgData.regions;
+            case Role.REGIONAL_ADMIN: units = orgData.regions; break;
             default: return [{ id: 'national', name: 'National HQ' }];
         }
+        return sortByName(units);
     };
 
     const handleFormSubmit = async (e: React.FormEvent) => {

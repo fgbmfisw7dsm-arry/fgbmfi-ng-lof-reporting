@@ -36,10 +36,53 @@ const ReportsPage: React.FC = () => {
                 apiService.getRegions(), apiService.getDistricts(), apiService.getZones(), apiService.getAreas(), apiService.getChapters()
             ]);
             setOrgRegistry({ regions: regs, districts: dists, zones: zones, areas: areas, chapters: chaps });
+
+            // Initialize filters based on user role for lockdown
+            if (user && user.unitId.trim().toUpperCase() !== 'NATIONAL') {
+                const normUnitId = user.unitId.trim().toUpperCase();
+                let initialFilters = { ...filters };
+
+                // Find hierarchy for lockdown
+                const findAncestors = () => {
+                    const chapter = chaps.find(c => c.id.trim().toUpperCase() === normUnitId);
+                    if (chapter) {
+                        const area = areas.find(a => a.id === chapter.areaId);
+                        const zone = zones.find(z => z.id === area?.zoneId);
+                        const district = dists.find(d => d.id === zone?.districtId);
+                        initialFilters = { ...initialFilters, regionId: district?.regionId || null, districtId: district?.id || null, zoneId: zone?.id || null, areaId: area?.id || null, chapterId: chapter.id };
+                        return;
+                    }
+                    const area = areas.find(a => a.id.trim().toUpperCase() === normUnitId);
+                    if (area) {
+                        const zone = zones.find(z => z.id === area.zoneId);
+                        const district = dists.find(d => d.id === zone?.districtId);
+                        initialFilters = { ...initialFilters, regionId: district?.regionId || null, districtId: district?.id || null, zoneId: zone?.id || null, areaId: area.id };
+                        return;
+                    }
+                    const zone = zones.find(z => z.id.trim().toUpperCase() === normUnitId);
+                    if (zone) {
+                        const district = dists.find(d => d.id === zone.districtId);
+                        initialFilters = { ...initialFilters, regionId: district?.regionId || null, districtId: district?.id || null, zoneId: zone.id };
+                        return;
+                    }
+                    const district = dists.find(d => d.id.trim().toUpperCase() === normUnitId);
+                    if (district) {
+                        initialFilters = { ...initialFilters, regionId: district.regionId, districtId: district.id };
+                        return;
+                    }
+                    const region = regs.find(r => r.id.trim().toUpperCase() === normUnitId);
+                    if (region) {
+                        initialFilters = { ...initialFilters, regionId: region.id };
+                    }
+                };
+
+                findAncestors();
+                setFilters(initialFilters);
+            }
         } catch (e) { console.error("Org Registry Sync Failed", e); }
     };
     fetchOrg();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     let mounted = true;
