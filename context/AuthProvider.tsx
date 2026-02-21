@@ -11,13 +11,11 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [pendingProfileUser, setPendingProfileUser] = useState<{ id: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = useCallback(async (id: string): Promise<boolean> => {
+  const fetchProfile = useCallback(async (id: string): Promise<'FOUND' | 'MISSING' | 'ERROR'> => {
       console.log("AuthProvider: Fetching profile for ID:", id);
       
-      // Create a promise that rejects after a timeout
       const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => reject(new Error("Profile fetch timed out")), 8000);
       });
@@ -29,21 +27,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             .eq('id', id)
             .single();
           
-          // Race the fetch against the timeout
           const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
           
           if (error) {
-              console.error("AuthProvider: Profile fetch error:", error);
-              return false;
+              // PGRST116 is the PostgREST code for "no rows found"
+              if (error.code === 'PGRST116') {
+                  console.warn("AuthProvider: Profile definitely missing for ID:", id);
+                  return 'MISSING';
+              }
+              console.error("AuthProvider: Profile fetch error (network/RLS):", error);
+              return 'ERROR';
           }
 
           if (data) {
               // BLOCK ARCHIVED USERS
               if (data.role === Role.FORMER_OFFICER || (data.email && data.email.toLowerCase().endsWith('@archived.lof'))) {
                   console.warn("AuthProvider: Access denied for archived/former officer:", data.email);
-                  // Force sign out from Supabase Auth to clear session
                   await supabase.auth.signOut();
-                  return false;
+                  return 'ERROR';
               }
 
               console.log("AuthProvider: Profile data found for", data.email);
@@ -57,21 +58,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   role: data.role as Role,
                   unitId: data.unit_id
               });
-              setPendingProfileUser(null);
-              return true;
+              return 'FOUND';
           }
-          console.warn("AuthProvider: No profile data returned for ID:", id);
-          return false;
+          return 'MISSING';
       } catch (err) {
           console.error("AuthProvider: fetchProfile exception:", err);
-          return false;
+          return 'ERROR';
       }
   }, []);
 
   const logout = useCallback(async () => {
     // Optimistic Update: Clear local state first to switch UI instantly
     setCurrentUser(null);
-    setPendingProfileUser(null);
     
     try {
         // Non-blocking sign out call
@@ -82,63 +80,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    const initSession = async () => {
-        console.log("AuthProvider: Initializing session...");
-        // Safety timeout: If cloud sync takes more than 5 seconds, proceed to login screen anyway
-        const timeout = setTimeout(() => {
-            console.warn("AuthProvider: Cloud sync timed out after 5s. Proceeding to login.");
-            setLoading(false);
-        }, 5000);
-
-        try {
-            console.log("AuthProvider: Fetching session from Supabase...");
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-            
-            if (sessionError) {
-                console.error("AuthProvider: getSession error:", sessionError);
-                throw sessionError;
-            }
-
-            if (session?.user) {
-                console.log("AuthProvider: Session found for user:", session.user.email);
-                const found = await fetchProfile(session.user.id);
-                if (!found) {
-                    console.log("AuthProvider: Profile not found for user, setting pending state.");
-                    setPendingProfileUser({ id: session.user.id, email: session.user.email || '' });
-                } else {
-                    console.log("AuthProvider: Profile successfully synced.");
-                }
-            } else {
-                console.log("AuthProvider: No active session found.");
-            }
-        } catch (err) {
-            console.error("AuthProvider: Session initialization failed:", err);
-        } finally {
-            console.log("AuthProvider: Initialization complete, clearing loading state.");
-            clearTimeout(timeout);
-            setLoading(false);
-        }
-    };
-    initSession();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-            const found = await fetchProfile(session.user.id);
-            if (!found) {
-                setPendingProfileUser({ id: session.user.id, email: session.user.email || '' });
-            }
-        } else if (event === 'SIGNED_OUT') {
-            setCurrentUser(null);
-            setPendingProfileUser(null);
-        }
-    });
-
-    // REAL-TIME PROFILE SYNC (For Promotions/Role Changes)
+    let isMounted = true;
     let profileSubscription: any = null;
-    
+
     const setupProfileSubscription = (userId: string) => {
         if (profileSubscription) profileSubscription.unsubscribe();
-        
         console.log("AuthProvider: Setting up real-time sync for user:", userId);
         profileSubscription = supabase
             .channel(`public:profiles:id=eq.${userId}`)
@@ -148,17 +94,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 table: 'profiles',
                 filter: `id=eq.${userId}` 
             }, (payload) => {
+                if (!isMounted) return;
                 console.log("AuthProvider: Profile update detected via real-time channel:", payload.new);
                 const data = payload.new;
                 
-                // Check for deactivation/archival
                 if (data.role === Role.FORMER_OFFICER || (data.email && data.email.toLowerCase().endsWith('@archived.lof'))) {
-                    console.warn("AuthProvider: Access revoked in real-time.");
                     logout();
                     return;
                 }
 
-                // Update local state with new role/unit (Promotion handling)
                 setCurrentUser({
                     id: data.id,
                     name: data.name,
@@ -173,15 +117,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             .subscribe();
     };
 
-    if (currentUser?.id) {
-        setupProfileSubscription(currentUser.id);
-    }
+    const handleAuthStateChange = async (event: string, session: any) => {
+        console.log(`AuthProvider: Auth Event [${event}] for ${session?.user?.email || 'no-user'}`);
+        
+        if (session?.user) {
+            const status = await fetchProfile(session.user.id);
+            if (!isMounted) return;
+
+            if (status === 'MISSING') {
+                console.error("AuthProvider: Profile missing for authenticated user.");
+                await supabase.auth.signOut();
+            } else if (status === 'FOUND') {
+                setupProfileSubscription(session.user.id);
+            }
+        } else {
+            setCurrentUser(null);
+        }
+        
+        if (isMounted) setLoading(false);
+    };
+
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        if (isMounted) handleAuthStateChange('INITIAL_SESSION', session);
+    });
+
+    // Listen for future changes
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+            handleAuthStateChange(event, session);
+        }
+    });
 
     return () => {
+        isMounted = false;
         authListener.subscription.unsubscribe();
         if (profileSubscription) profileSubscription.unsubscribe();
     };
-  }, [fetchProfile, currentUser?.id, logout]);
+  }, [fetchProfile, logout]);
 
   // Periodic status check to catch archived users in active sessions
   useEffect(() => {
@@ -228,41 +201,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (authData.user) {
             console.log("AuthProvider: Auth successful, fetching profile...");
-            const profileFound = await fetchProfile(authData.user.id);
-            if (!profileFound) {
-                console.log("AuthProvider: Profile not found, setting pending onboarding.");
-                setPendingProfileUser({ id: authData.user.id, email: authData.user.email || '' });
+            const status = await fetchProfile(authData.user.id);
+            if (status === 'MISSING') {
+                throw new Error("Profile not found. Please contact your Administrator to activate your account.");
+            } else if (status === 'ERROR') {
+                throw new Error("Cloud sync failed. Your login was successful, but we couldn't load your profile. Please try again.");
             }
         }
         return true;
     } catch (e: any) {
         console.error("AuthProvider: Login process exception:", e.message);
         throw e;
-    }
-  };
-
-  const completeProfile = async (details: Partial<User>) => {
-    if (!pendingProfileUser) return;
-    
-    const newUser: User = {
-        id: pendingProfileUser.id,
-        email: pendingProfileUser.email,
-        name: details.name || 'FGBMFI Officer',
-        username: (details.username || pendingProfileUser.email.split('@')[0]).toLowerCase(),
-        phone: details.phone || '',
-        password: '',
-        role: details.role || Role.CHAPTER_PRESIDENT,
-        unitId: (details.unitId || '').trim().toUpperCase()
-    };
-
-    console.log("AuthProvider: Finalizing profile creation for user:", newUser.email);
-    const status = await apiService.upsertUser(newUser);
-    
-    if (status === 'SUCCESS' || status === 'RLS_DELEGATED') {
-        setCurrentUser(newUser);
-        setPendingProfileUser(null);
-    } else {
-        throw new Error("Unable to sync profile with database. Contact your Admin.");
     }
   };
 
@@ -278,13 +227,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const authContextValue = useMemo(() => ({
     user: currentUser,
-    pendingProfileUser,
     login,
     logout,
     updateUser,
-    completeProfile,
-    clearPending: () => setPendingProfileUser(null)
-  }), [currentUser, pendingProfileUser, logout]);
+  }), [currentUser, logout]);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 flex-col space-y-4">
