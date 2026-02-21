@@ -37,12 +37,10 @@ const ReportsPage: React.FC = () => {
             ]);
             setOrgRegistry({ regions: regs, districts: dists, zones: zones, areas: areas, chapters: chaps });
 
-            // Initialize filters based on user role for lockdown
             if (user && user.unitId.trim().toUpperCase() !== 'NATIONAL') {
                 const normUnitId = user.unitId.trim().toUpperCase();
                 let initialFilters = { ...filters };
 
-                // Find hierarchy for lockdown
                 const findAncestors = () => {
                     const chapter = chaps.find(c => c.id.trim().toUpperCase() === normUnitId);
                     if (chapter) {
@@ -209,7 +207,34 @@ const ReportsPage: React.FC = () => {
     }
 
     const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
-    nextLevelUnits.sort((a, b) => collator.compare(a.name, b.name));
+    
+    // Hierarchical Sorting Helper
+    const getUnitSortKey = (unit: any, type: string) => {
+        if (type === 'region') return unit.name;
+        if (type === 'district') {
+            const reg = orgRegistry.regions.find(r => r.id === unit.regionId);
+            return `${reg?.name || ''} | ${unit.name}`;
+        }
+        if (type === 'zone') {
+            const dist = orgRegistry.districts.find(d => d.id === unit.districtId);
+            const reg = orgRegistry.regions.find(r => r.id === dist?.regionId);
+            return `${reg?.name || ''} | ${dist?.name || ''} | ${unit.name}`;
+        }
+        if (type === 'area') {
+            const zone = orgRegistry.zones.find(z => z.id === unit.zoneId);
+            const dist = orgRegistry.districts.find(d => d.id === zone?.districtId);
+            return `${dist?.name || ''} | ${zone?.name || ''} | ${unit.name}`;
+        }
+        if (type === 'chapter') {
+            const area = orgRegistry.areas.find(a => a.id === unit.areaId);
+            const zone = orgRegistry.zones.find(z => z.id === area?.zoneId);
+            return `${zone?.name || ''} | ${area?.name || ''} | ${unit.name}`;
+        }
+        return unit.name;
+    };
+    
+    // Perform Hierarchical Sort
+    nextLevelUnits.sort((a, b) => collator.compare(getUnitSortKey(a, groupBy), getUnitSortKey(b, groupBy)));
     
     const sumData = (acc: any, curr: any) => ({
         membershipCount: (acc.membershipCount || 0) + (curr.membershipCount || 0),
@@ -281,12 +306,22 @@ const ReportsPage: React.FC = () => {
 
   return (
     <div className="printable-area">
-      <div className="flex justify-between items-center mb-6 print:hidden">
-        <h1 className="text-3xl font-bold text-gray-800">Reports Portal</h1>
-        <div className="flex space-x-2">
-            <button onClick={() => exportService.toPDF(reportMetadata.title, reportMetadata.subTitle, filters.startDate ? `Period: ${filters.startDate} to ${filters.endDate}` : "Period: All Recorded History", breakdownData.length > 0 && !filters.chapterId, breakdownData.length > 0 && !filters.chapterId ? breakdownData : reports)} className="bg-fgbmfi-red text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-800 flex items-center shadow-sm active:scale-95"><Icon name="archive-box" className="w-4 h-4 mr-2"/>Export PDF</button>
-            <button onClick={() => exportService.toCSV(reportMetadata.title, reportMetadata.subTitle, filters.startDate ? `Period: ${filters.startDate} to ${filters.endDate}` : "Period: All Recorded History", breakdownData.length > 0 && !filters.chapterId, breakdownData.length > 0 && !filters.chapterId ? breakdownData : reports)} className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 flex items-center shadow-sm active:scale-95"><Icon name="report" className="w-4 h-4 mr-2"/>Export Excel</button>
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-8 gap-4 print:hidden">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Reports Portal</h1>
+          <p className="text-gray-500 mt-1 font-medium">Analyze performance and growth trends across the Fellowship.</p>
         </div>
+        {reportMetadata.unit && (
+          <div className="bg-fgbmfi-blue text-white px-6 py-3 rounded-2xl shadow-lg flex flex-col items-end">
+            <span className="text-[10px] font-black uppercase tracking-widest opacity-70">Assigned Unit</span>
+            <span className="text-sm font-black uppercase tracking-tight">{reportMetadata.unit}</span>
+          </div>
+        )}
+      </div>
+      
+      <div className="flex justify-end space-x-2 mb-6 print:hidden">
+          <button onClick={() => exportService.toPDF(reportMetadata.title, reportMetadata.subTitle, filters.startDate ? `Period: ${filters.startDate} to ${filters.endDate}` : "Period: All Recorded History", breakdownData.length > 0 && !filters.chapterId, breakdownData.length > 0 && !filters.chapterId ? breakdownData : reports)} className="bg-fgbmfi-red text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-800 flex items-center shadow-sm active:scale-95"><Icon name="archive-box" className="w-4 h-4 mr-2"/>Export PDF</button>
+          <button onClick={() => exportService.toCSV(reportMetadata.title, reportMetadata.subTitle, filters.startDate ? `Period: ${filters.startDate} to ${filters.endDate}` : "Period: All Recorded History", breakdownData.length > 0 && !filters.chapterId, breakdownData.length > 0 && !filters.chapterId ? breakdownData : reports)} className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 flex items-center shadow-sm active:scale-95"><Icon name="report" className="w-4 h-4 mr-2"/>Export Excel</button>
       </div>
       <ReportFiltersSection filters={filters} handleFilterChange={handleFilterChange} handleDateChange={handleDateChange} />
       {loading ? ( <div className="p-20 text-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-fgbmfi-blue mx-auto mb-4"></div><p className="text-xs font-black uppercase text-gray-400">Syncing Cloud Reports...</p></div> ) : (

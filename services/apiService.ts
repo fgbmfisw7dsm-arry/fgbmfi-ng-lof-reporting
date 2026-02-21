@@ -5,8 +5,31 @@ const REGISTRY_LIMIT = 10000;
 
 export const apiService = {
   getUsers: async (): Promise<User[]> => {
-      const { data, error } = await supabase.from('profiles').select('*').limit(REGISTRY_LIMIT).order('name');
+      // Filter out deactivated/deleted profiles
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .neq('role', Role.FORMER_OFFICER)
+        .not('email', 'ilike', '%@archived.lof')
+        .limit(REGISTRY_LIMIT)
+        .order('name');
+
       if (error) throw new Error(`Registry Load Error: ${error.message}`);
+      return (data || []).map(p => ({
+          id: p.id, name: p.name, username: p.username, email: p.email,
+          phone: p.phone || '', password: '', role: p.role as Role, unitId: p.unit_id
+      }));
+  },
+
+  getArchivedUsers: async (): Promise<User[]> => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .or(`role.eq."${Role.FORMER_OFFICER}",email.ilike."%@archived.lof"`)
+        .limit(REGISTRY_LIMIT)
+        .order('name');
+
+      if (error) throw new Error(`Archive Load Error: ${error.message}`);
       return (data || []).map(p => ({
           id: p.id, name: p.name, username: p.username, email: p.email,
           phone: p.phone || '', password: '', role: p.role as Role, unitId: p.unit_id
@@ -32,23 +55,62 @@ export const apiService = {
       if (!user.id || !user.unitId || !user.role) {
           throw new Error("Missing required profile fields.");
       }
+      const isDeletedUsername = user.username.startsWith('deleted_');
       const payload = {
           id: user.id, 
           name: user.name || 'New Officer',
-          username: (user.username || user.email.split('@')[0]).toLowerCase().trim(),
+          username: (isDeletedUsername || !user.username ? user.email.split('@')[0] : user.username).toLowerCase().trim(),
           email: user.email.toLowerCase().trim(),
           role: user.role,
           unit_id: user.unitId.trim().toUpperCase(),
           phone: user.phone || ''
       };
-      const { error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' });
-      if (error) throw new Error(`Profile Sync Failed: ${error.message}`);
+      
+      console.log("apiService: Upserting profile for", payload.email);
+      const { error, data } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' }).select();
+      
+      if (error) {
+          console.error("apiService: Upsert error:", error);
+          throw new Error(`Profile Sync Failed: ${error.message}`);
+      }
+      
+      if (!data || data.length === 0) {
+          throw new Error("Profile Sync Blocked: Row-Level Security (RLS) prevented this update. Ensure your Admin account has 'UPDATE' permissions for other profiles.");
+      }
+      
       return 'SUCCESS';
   },
 
   deleteUser: async (userId: string) => {
-      const { error } = await supabase.from('profiles').delete().eq('id', userId);
-      if (error) throw new Error(`Cloud Delete Failed: ${error.message}`);
+      // PERMANENT FIX FOR DATA LOSS: 
+      // Instead of deleting the profile (which triggers cascade delete of reports),
+      // we "deactivate" it by renaming and changing the email/username.
+      // This preserves the UUID (id) so historical reports stay linked and visible.
+      
+      const { data: profile } = await supabase.from('profiles').select('email, name').eq('id', userId).single();
+      
+      if (!profile) throw new Error("Profile not found.");
+
+      const deletedMarker = `deleted_${Date.now()}_${userId.substring(0, 8)}`;
+      const payload = {
+          name: `(Former) ${profile.name}`,
+          email: `${deletedMarker}@archived.lof`,
+          username: deletedMarker,
+          role: Role.FORMER_OFFICER
+      };
+
+      console.log("apiService: Archiving profile for", userId);
+      const { error, data } = await supabase.from('profiles').update(payload).eq('id', userId).select();
+      
+      if (error) {
+          console.error("apiService: Deactivation error:", error);
+          throw new Error(`Deactivation Failed: ${error.message}`);
+      }
+      
+      if (!data || data.length === 0) {
+          throw new Error("Deactivation Blocked: Row-Level Security (RLS) prevented this update. You may not have permission to modify this specific profile.");
+      }
+      
       return true;
   },
 

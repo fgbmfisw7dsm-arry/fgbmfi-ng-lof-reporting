@@ -1,11 +1,12 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../../context/AuthContext';
 import { apiService } from '../../services/apiService';
-import { EventReport, EventType } from '../../types';
+import { EventReport, EventType, Role } from '../../types';
 
 const EventReportForm: React.FC = () => {
   const { user } = useContext(AuthContext);
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
+  const [unitName, setUnitName] = useState('');
 
   const [formData, setFormData] = useState({
     dateOfEvent: '',
@@ -21,15 +22,37 @@ const EventReportForm: React.FC = () => {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    const fetchTypes = async () => {
-      const types = await apiService.getEventTypes();
-      setEventTypes(types);
-      if (types.length > 0) {
-        setFormData(prev => ({ ...prev, eventType: types[0].name }));
+    const fetchData = async () => {
+      try {
+        const [types, regs, dists, zones, areas, chaps] = await Promise.all([
+          apiService.getEventTypes(),
+          apiService.getRegions(),
+          apiService.getDistricts(),
+          apiService.getZones(),
+          apiService.getAreas(),
+          apiService.getChapters()
+        ]);
+        
+        setEventTypes(types);
+        if (types.length > 0) {
+          setFormData(prev => ({ ...prev, eventType: types[0].name }));
+        }
+
+        if (user?.unitId) {
+          if (user.unitId === 'national') {
+            setUnitName('National HQ');
+          } else {
+            const allUnits = [...regs, ...dists, ...zones, ...areas, ...chaps];
+            const unit = allUnits.find(u => u.id === user.unitId);
+            if (unit) setUnitName(unit.name);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch form data", err);
       }
     };
-    fetchTypes();
-  }, []);
+    fetchData();
+  }, [user?.unitId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -43,6 +66,15 @@ const EventReportForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    // SECURITY CHECK: Prevent archived users from submitting
+    if (user.role === Role.FORMER_OFFICER || user.email.toLowerCase().endsWith('@archived.lof')) {
+        setMessage("ACCESS REVOKED: Your officer profile has been archived. You can no longer submit reports.");
+        // Trigger a logout after a short delay
+        setTimeout(() => window.location.reload(), 3000);
+        return;
+    }
+
     if (!formData.eventType) {
       setMessage("Please select an event type category.");
       return;
@@ -87,7 +119,14 @@ const EventReportForm: React.FC = () => {
     <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
       <div className="mb-8 border-b border-gray-100 pb-6">
           <h2 className="text-2xl font-black text-fgbmfi-blue">Event Outcome Entry</h2>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Data Submission for {user?.role}</p>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mt-1">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Data Submission for {user?.role}</p>
+            {unitName && (
+              <p className="text-[10px] font-black text-fgbmfi-blue uppercase tracking-widest bg-fgbmfi-blue/5 px-3 py-1 rounded-full mt-2 md:mt-0">
+                {unitName}
+              </p>
+            )}
+          </div>
       </div>
       
       <form onSubmit={handleSubmit} className="space-y-6">

@@ -16,6 +16,7 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
     const [modalOpen, setModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [showArchived, setShowArchived] = useState(false);
     const [statusNote, setStatusNote] = useState<{msg: string, type: 'success' | 'error' | 'info' | 'delegated', showFix?: boolean} | null>(null);
     
     const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; userId: string; userName: string }>({
@@ -26,12 +27,12 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
 
     useEffect(() => {
         refreshUserList();
-    }, []);
+    }, [showArchived]);
 
     const refreshUserList = async () => {
         setIsLoading(true);
         try {
-            const dbUsers = await apiService.getUsers();
+            const dbUsers = showArchived ? await apiService.getArchivedUsers() : await apiService.getUsers();
             setUsers(dbUsers);
         } catch (error: any) {
             console.error("Registry load failure:", error);
@@ -64,7 +65,15 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
             const profileData = { ...userToSave, id: finalUserId };
             const syncStatus = await apiService.upsertUser(profileData);
             
-            await refreshUserList();
+            // If we were in archived view and just reactivated someone (role changed from FORMER_OFFICER)
+            // or if we just updated an archived user, it's better to go back to active registry
+            // to confirm they are now visible there.
+            if (showArchived && userToSave.role !== Role.FORMER_OFFICER) {
+                setShowArchived(false);
+            } else {
+                await refreshUserList();
+            }
+            
             setModalOpen(false);
 
             if (syncStatus === 'RLS_DELEGATED') {
@@ -73,7 +82,16 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
                 setStatusNote({ msg: `Officer registry updated successfully.`, type: 'success' });
             }
         } catch (error: any) {
-            setStatusNote({ msg: error.message, type: 'error' });
+            let msg = error.message;
+            const isAccessError = msg.includes("RLS") || msg.includes("Blocked") || msg.includes("permission");
+            
+            if (msg.includes("already has a login account")) {
+                msg = `CRITICAL: The email "${userToSave.email}" is already registered in Supabase Auth. 
+                       Since the previous officer was removed, you must either:
+                       1. Use a different email for this new officer.
+                       2. Contact the National Admin to permanently delete the old Auth account from the Supabase Dashboard.`;
+            }
+            setStatusNote({ msg, type: 'error', showFix: isAccessError });
         } finally {
             setIsLoading(false);
         }
@@ -94,13 +112,18 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
         setStatusNote(null);
         try {
             await apiService.deleteUser(userId);
-            setStatusNote({ msg: `Profile for ${userName} removed from registry.`, type: 'success' });
+            setStatusNote({ msg: `Officer profile for ${userName} has been archived. Historical reports are preserved.`, type: 'success' });
             setUsers(users.filter(u => u.id !== userId));
             await refreshUserList();
         } catch (error: any) {
-            const isAccessError = error.message.includes("Access Denied") || error.message.includes("permission");
+            const isAccessError = error.message.includes("Access Denied") || 
+                                 error.message.includes("permission") || 
+                                 error.message.includes("Cloud Security") ||
+                                 error.message.includes("RLS") ||
+                                 error.message.includes("Blocked");
+            
             setStatusNote({ 
-                msg: isAccessError ? "Access Denied: Deletion blocked by Cloud Security (RLS)." : error.message, 
+                msg: isAccessError ? `Action Blocked: ${error.message}` : error.message, 
                 type: 'error',
                 showFix: isAccessError
             });
@@ -158,7 +181,20 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
             )}
 
             <div className="p-6 border-b flex justify-between items-center">
-                 <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">Officer Registry</h3>
+                 <div className="flex items-center space-x-4">
+                    <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">Officer Registry</h3>
+                    <div className="h-4 w-[1px] bg-gray-200"></div>
+                    <button 
+                        onClick={() => setShowArchived(!showArchived)}
+                        className={`text-[10px] font-black uppercase tracking-tight px-3 py-1 rounded-full transition-all ${
+                            showArchived 
+                            ? 'bg-orange-100 text-orange-700 border border-orange-200' 
+                            : 'bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200'
+                        }`}
+                    >
+                        {showArchived ? 'Viewing Archived' : 'Show Archived'}
+                    </button>
+                 </div>
                  <button onClick={() => { setEditingUser(null); setModalOpen(true); }} className="px-5 py-2.5 bg-fgbmfi-blue text-white text-xs font-black rounded-2xl shadow-lg flex items-center transition-transform hover:scale-105">
                     <Icon name="plus" className="w-3 h-3 mr-2" /> Add New Officer
                  </button>
@@ -176,30 +212,43 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-100">
                         {users.length > 0 ? users.map((u) => (
-                            <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
+                            <tr key={u.id} className={`hover:bg-gray-50/50 transition-colors ${showArchived ? 'opacity-75' : ''}`}>
                                 <td className="px-6 py-4">
                                     <div className="text-sm font-bold text-gray-900">{u.name}</div>
                                     <div className="text-[10px] text-gray-400 font-medium">{u.email}</div>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <span className="px-2 py-1 bg-fgbmfi-blue/5 text-fgbmfi-blue rounded-md text-[10px] font-black uppercase">
+                                    <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase ${
+                                        u.role === Role.FORMER_OFFICER 
+                                        ? 'bg-gray-100 text-gray-400' 
+                                        : 'bg-fgbmfi-blue/5 text-fgbmfi-blue'
+                                    }`}>
                                         {u.role}
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-xs font-bold text-gray-500">{getUnitName(u)}</td>
                                 <td className="px-6 py-4 text-right space-x-4">
-                                    <button onClick={() => { setEditingUser(u); setModalOpen(true); }} className="text-[10px] font-black uppercase text-fgbmfi-blue hover:underline">Edit</button>
                                     <button 
-                                        onClick={() => triggerDelete(u.id, u.name)} 
-                                        disabled={isLoading}
-                                        className="text-[10px] font-black uppercase text-red-400 hover:text-red-600 disabled:opacity-30"
+                                        onClick={() => { setEditingUser(u); setModalOpen(true); }} 
+                                        className={`text-[10px] font-black uppercase ${showArchived ? 'text-orange-600 hover:underline' : 'text-fgbmfi-blue hover:underline'}`}
                                     >
-                                        Delete
+                                        {showArchived ? 'Reactivate' : 'Edit'}
                                     </button>
+                                    {!showArchived && (
+                                        <button 
+                                            onClick={() => triggerDelete(u.id, u.name)} 
+                                            disabled={isLoading}
+                                            className="text-[10px] font-black uppercase text-red-400 hover:text-red-600 disabled:opacity-30"
+                                        >
+                                            Delete
+                                        </button>
+                                    )}
                                 </td>
                             </tr>
                         )) : (
-                            <tr><td colSpan={4} className="px-6 py-20 text-center text-gray-300 font-bold uppercase text-[10px] tracking-widest">No Registered Officers Found</td></tr>
+                            <tr><td colSpan={4} className="px-6 py-20 text-center text-gray-300 font-bold uppercase text-[10px] tracking-widest">
+                                {showArchived ? 'No Archived Officers Found' : 'No Registered Officers Found'}
+                            </td></tr>
                         )}
                     </tbody>
                 </table>
@@ -211,10 +260,12 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
                 isOpen={deleteConfirm.isOpen} 
                 onClose={() => setDeleteConfirm({ ...deleteConfirm, isOpen: false })} 
                 onConfirm={handleConfirmDelete} 
-                title="Remove Officer Profile?" 
-                message={`Are you sure you want to remove the officer profile for "${deleteConfirm.userName}"? They will lose access to all reports immediately.`}
-                confirmButtonText="Yes, Delete"
-                confirmButtonClass="bg-red-600"
+                title="Archive Officer Profile?" 
+                message={`Are you sure you want to remove the officer profile for "${deleteConfirm.userName}"? 
+                          This will archive their profile and block their access. 
+                          IMPORTANT: All historical reports submitted by this officer will be PERMANENTLY PRESERVED in the system.`}
+                confirmButtonText="Yes, Archive"
+                confirmButtonClass="bg-orange-600"
             />
         </div>
     );

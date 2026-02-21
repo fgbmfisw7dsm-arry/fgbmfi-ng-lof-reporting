@@ -5,7 +5,7 @@ import { ChapterMonthlyReport } from '../../types';
 
 const ChapterReportForm: React.FC = () => {
   const { user } = useContext(AuthContext);
-  const [unitLabel, setUnitLabel] = useState('Loading Chapter Registry...');
+  const [unitLabel, setUnitLabel] = useState(user?.unitId || '');
   const [formData, setFormData] = useState({
     month: 'January',
     year: new Date().getFullYear(),
@@ -28,11 +28,9 @@ const ChapterReportForm: React.FC = () => {
                 const currentUnit = chapters.find(c => c.id === user.unitId);
                 if (currentUnit) {
                     setUnitLabel(`${currentUnit.name} (${currentUnit.id})`);
-                } else {
-                    setUnitLabel(user.unitId);
                 }
             } catch (err) {
-                setUnitLabel(user.unitId);
+                console.error("Chapter name fetch failed", err);
             }
         }
     };
@@ -78,7 +76,14 @@ const ChapterReportForm: React.FC = () => {
     <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
       <div className="mb-8 border-b border-gray-100 pb-6">
           <h2 className="text-2xl font-black text-fgbmfi-blue">Monthly Data Entry</h2>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Submission for {formData.month} {formData.year}</p>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mt-1">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Submission for {formData.month} {formData.year}</p>
+            {unitLabel && !unitLabel.includes('Loading') && (
+              <p className="text-[10px] font-black text-fgbmfi-blue uppercase tracking-widest bg-fgbmfi-blue/5 px-3 py-1 rounded-full mt-2 md:mt-0">
+                {unitLabel}
+              </p>
+            )}
+          </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">

@@ -127,6 +127,26 @@ const UserManualPage: React.FC = () => {
         addBullet("Clear All Data: Use with caution during setup to wipe all data.");
         y += 5;
 
+        addSectionTitle("6. Career Path: Promotions & Archiving");
+        addSubTitle("Officer Promotions");
+        addParagraph("When an officer is promoted (e.g., from Chapter President to Field Representative), their account remains the same.");
+        addBullet("Edit the officer in User Management.");
+        addBullet("Change their 'Designated Office' and 'Assigned Unit'.");
+        addBullet("The officer's dashboard and forms will update instantly without requiring a logout.");
+
+        addSubTitle("Archiving & Deactivation");
+        addParagraph("To remove an officer from active service while preserving their historical reports:");
+        addBullet("Click 'Delete' on the officer's profile in the Registry.");
+        addBullet("This archives their profile and revokes their access immediately.");
+
+        addSubTitle("Reactivation");
+        addParagraph("If a former officer returns to service:");
+        addBullet("Click 'Show Archived' in the Officer Registry.");
+        addBullet("Locate the officer and click 'Reactivate'.");
+        addBullet("Restore their real email and assign their new role/unit.");
+        addBullet("The system will automatically switch you back to the active registry upon saving.");
+        y += 5;
+
         addSectionTitle("Troubleshooting");
         addBullet("Fictitious Data? Admin should use 'Clear All Data' to remove system defaults.");
         addBullet("Empty Dashboard? Ensure you are viewing the current year.");
@@ -244,6 +264,30 @@ const UserManualPage: React.FC = () => {
         <ul style={{marginLeft: '20px', listStyleType: 'disc'}}>
             <li><strong>Archive Data:</strong> Select a year and click <strong>Archive</strong> to move old data out of the active view to improve performance.</li>
             <li><strong>Clear All Data (Danger):</strong> Use this only during initial setup to wipe all reporting data and start fresh. <strong>This cannot be undone.</strong></li>
+        </ul>
+
+        <h2 style={{color: '#B71C1C', fontSize: '20px', marginTop: '24px', marginBottom: '12px', fontWeight: 'bold'}}>6. Career Path: Promotions & Archiving</h2>
+        <p>The system supports the natural evolution of an officer's service within the Fellowship.</p>
+
+        <h3 style={{fontSize: '18px', fontWeight: 'bold', marginTop: '16px', marginBottom: '8px'}}>Officer Promotions</h3>
+        <ul style={{marginLeft: '20px', listStyleType: 'disc'}}>
+            <li>When an officer is promoted (e.g., from Chapter President to Field Representative), their account remains the same.</li>
+            <li><strong>Action:</strong> Edit the officer in User Management, change their "Designated Office" and "Assigned Unit," and save.</li>
+            <li>The officer's dashboard and forms will update instantly without requiring a logout.</li>
+        </ul>
+
+        <h3 style={{fontSize: '18px', fontWeight: 'bold', marginTop: '16px', marginBottom: '8px'}}>Archiving & Deactivation</h3>
+        <ul style={{marginLeft: '20px', listStyleType: 'disc'}}>
+            <li>To remove an officer from active service while preserving their historical reports:</li>
+            <li><strong>Action:</strong> Click <strong>Delete</strong> on the officer's profile in the Registry.</li>
+            <li>This archives their profile and revokes their access immediately.</li>
+        </ul>
+
+        <h3 style={{fontSize: '18px', fontWeight: 'bold', marginTop: '16px', marginBottom: '8px'}}>Reactivation</h3>
+        <ul style={{marginLeft: '20px', listStyleType: 'disc'}}>
+            <li>If a former officer returns to service:</li>
+            <li><strong>Action:</strong> Click <strong>Show Archived</strong> in the Officer Registry, locate the officer, and click <strong>Reactivate</strong>.</li>
+            <li>Restore their real email and assign their new role/unit. The system will automatically switch you back to the active registry upon saving.</li>
         </ul>
 
         <h2 style={{color: '#B71C1C', fontSize: '20px', marginTop: '24px', marginBottom: '12px', fontWeight: 'bold'}}>Troubleshooting</h2>

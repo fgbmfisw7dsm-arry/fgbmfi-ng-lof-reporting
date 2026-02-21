@@ -198,7 +198,15 @@ export const UserFormModal: React.FC<{
                         <div className="grid grid-cols-2 gap-6">
                             <div>
                                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Official Email Address</label>
-                                <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value.toLowerCase().trim()})} className={user ? disabledInputClass : inputClass} required placeholder="officer@lof-nigeria.org" disabled={!!user || isSubmitting} />
+                                <input 
+                                    type="email" 
+                                    value={formData.email} 
+                                    onChange={e => setFormData({...formData, email: e.target.value.toLowerCase().trim()})} 
+                                    className={(user && !user.email.includes('@archived.lof')) ? disabledInputClass : inputClass} 
+                                    required 
+                                    placeholder="officer@lof-nigeria.org" 
+                                    disabled={(!!user && !user.email.includes('@archived.lof')) || isSubmitting} 
+                                />
                             </div>
                             <div>
                                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Phone Number</label>
@@ -220,8 +228,14 @@ export const UserFormModal: React.FC<{
                             <div>
                                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Designated Office</label>
                                 <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value as Role, unitId: ''})} className={inputClass} disabled={isSubmitting}>
+                                    {formData.role === Role.FORMER_OFFICER && <option value={Role.FORMER_OFFICER}>{Role.FORMER_OFFICER} (Archived)</option>}
                                     {ROLES.map(role => <option key={role} value={role}>{role}</option>)}
                                 </select>
+                                {formData.role === Role.FORMER_OFFICER && (
+                                    <p className="mt-1 text-[9px] text-orange-600 font-bold uppercase tracking-tight italic">
+                                        * Select a new active role to reactivate this officer.
+                                    </p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Assigned Organizational Unit</label>

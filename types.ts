@@ -9,6 +9,7 @@ export enum Role {
   NATIONAL_DIRECTOR = 'National Director (ND)',
   FIELD_REPRESENTATIVE = 'Field Representative (FR)',
   CHAPTER_PRESIDENT = 'Chapter President (CP)',
+  FORMER_OFFICER = 'Former Officer',
 }
 
 export interface User {

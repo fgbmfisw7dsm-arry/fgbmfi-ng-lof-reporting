@@ -17,7 +17,6 @@ const LoginScreen: React.FC = () => {
   const timeoutRef = useRef<number | null>(null);
   const { login, pendingProfileUser, completeProfile, logout } = useContext(AuthContext);
 
-  // Onboarding Form State
   const [onboardingData, setOnboardingData] = useState({ name: '', phone: '', role: Role.CHAPTER_PRESIDENT, unitId: '' });
   const [orgData, setOrgData] = useState<{
     regions: any[],
@@ -37,7 +36,7 @@ const LoginScreen: React.FC = () => {
     if (isLoading) {
       timeoutRef.current = window.setTimeout(() => {
         setShowReset(true);
-      }, 10000); // 10 seconds timeout
+      }, 10000); 
     } else {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       setShowReset(false);
@@ -68,11 +67,27 @@ const LoginScreen: React.FC = () => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
+    
+    // Safety timeout for the login attempt itself
+    const loginTimeout = window.setTimeout(() => {
+        if (isLoading) {
+            setError("The cloud connection is taking longer than expected. Please check your internet or try the 'Reset Connection' button below.");
+            setIsLoading(false);
+        }
+    }, 15000);
+
     try {
+        console.log("LoginScreen: Attempting login for", identifier);
         await login(identifier, password);
+        console.log("LoginScreen: Login call returned successfully.");
+        // Note: We don't set isLoading(false) here because the AuthProvider state change 
+        // should trigger a re-render/redirect. If it doesn't, the timeout will catch it.
     } catch (err: any) {
+        console.error("LoginScreen: Login error:", err);
         setError(err.message || 'Login failed. Check your credentials.');
         setIsLoading(false);
+    } finally {
+        window.clearTimeout(loginTimeout);
     }
   };
 
@@ -106,17 +121,42 @@ const LoginScreen: React.FC = () => {
 
   const getAvailableUnits = () => {
     let units: any[] = [];
+    let type = '';
     switch (onboardingData.role) {
-        case Role.CHAPTER_PRESIDENT: units = orgData.chapters; break;
-        case Role.FIELD_REPRESENTATIVE: units = orgData.areas; break;
-        case Role.NATIONAL_DIRECTOR: units = orgData.zones; break;
+        case Role.CHAPTER_PRESIDENT: units = orgData.chapters; type = 'chapter'; break;
+        case Role.FIELD_REPRESENTATIVE: units = orgData.areas; type = 'area'; break;
+        case Role.NATIONAL_DIRECTOR: units = orgData.zones; type = 'zone'; break;
         case Role.DISTRICT_COORDINATOR:
-        case Role.DISTRICT_ADMIN: units = orgData.districts; break;
+        case Role.DISTRICT_ADMIN: units = orgData.districts; type = 'district'; break;
         case Role.REGIONAL_VICE_PRESIDENT:
-        case Role.REGIONAL_ADMIN: units = orgData.regions; break;
+        case Role.REGIONAL_ADMIN: units = orgData.regions; type = 'region'; break;
         default: return [{ id: 'national', name: 'National Headquarters' }];
     }
-    return [...units].sort((a, b) => collator.compare(a.name, b.name));
+
+    const getSortKey = (u: any) => {
+        if (type === 'region') return u.name;
+        if (type === 'district') {
+            const reg = orgData.regions.find((r: any) => r.id === u.regionId);
+            return `${reg?.name || ''} | ${u.name}`;
+        }
+        if (type === 'zone') {
+            const dist = orgData.districts.find((d: any) => d.id === u.districtId);
+            return `${dist?.name || ''} | ${u.name}`;
+        }
+        if (type === 'area') {
+            const zone = orgData.zones.find((z: any) => z.id === u.zoneId);
+            const dist = orgData.districts.find((d: any) => d.id === zone?.districtId);
+            return `${dist?.name || ''} | ${zone?.name || ''} | ${u.name}`;
+        }
+        if (type === 'chapter') {
+            const area = orgData.areas.find((a: any) => a.id === u.areaId);
+            const zone = orgData.zones.find((z: any) => z.id === area?.zoneId);
+            return `${zone?.name || ''} | ${area?.name || ''} | ${u.name}`;
+        }
+        return u.name;
+    };
+
+    return [...units].sort((a, b) => collator.compare(getSortKey(a), getSortKey(b)));
   };
 
   if (pendingProfileUser) {

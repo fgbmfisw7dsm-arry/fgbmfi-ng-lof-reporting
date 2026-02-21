@@ -10,7 +10,6 @@ interface FilterProps {
 }
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
-const sortByName = (items: any[]) => [...items].sort((a, b) => collator.compare(a.name, b.name));
 
 export const ReportFiltersSection: React.FC<FilterProps> = ({ filters, handleFilterChange, handleDateChange }) => {
   const { user } = useContext(AuthContext);
@@ -20,8 +19,8 @@ export const ReportFiltersSection: React.FC<FilterProps> = ({ filters, handleFil
   const [areas, setAreas] = useState<Area[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
 
-  // Calculate Lock State - Ensure strictly boolean to satisfy TS2322
-  const isNational = user?.unitId.trim().toUpperCase() === 'NATIONAL';
+  // Strict boolean casting for Vercel/TS compiler compatibility
+  const isNational = user?.unitId ? user.unitId.trim().toUpperCase() === 'NATIONAL' : false;
   
   const lockRegion = user ? [Role.REGIONAL_VICE_PRESIDENT, Role.REGIONAL_ADMIN, Role.DISTRICT_COORDINATOR, Role.DISTRICT_ADMIN, Role.NATIONAL_DIRECTOR, Role.FIELD_REPRESENTATIVE, Role.CHAPTER_PRESIDENT].includes(user.role) : false;
   const lockDistrict = user ? [Role.DISTRICT_COORDINATOR, Role.DISTRICT_ADMIN, Role.NATIONAL_DIRECTOR, Role.FIELD_REPRESENTATIVE, Role.CHAPTER_PRESIDENT].includes(user.role) : false;
@@ -30,26 +29,26 @@ export const ReportFiltersSection: React.FC<FilterProps> = ({ filters, handleFil
   const lockChapter = user ? [Role.CHAPTER_PRESIDENT].includes(user.role) : false;
 
   useEffect(() => {
-    apiService.getRegions().then(data => setRegions(sortByName(data))).catch(err => console.error("Filter Region Load Failed:", err));
+    apiService.getRegions().then(data => setRegions([...data].sort((a,b) => collator.compare(a.name, b.name))));
   }, []);
 
   useEffect(() => {
-    if (filters.regionId) apiService.getDistricts(filters.regionId).then(data => setDistricts(sortByName(data))).catch(e => console.error(e));
+    if (filters.regionId) apiService.getDistricts(filters.regionId).then(data => setDistricts([...data].sort((a,b) => collator.compare(a.name, b.name))));
     else setDistricts([]);
   }, [filters.regionId]);
 
   useEffect(() => {
-    if (filters.districtId) apiService.getZones(filters.districtId).then(data => setZones(sortByName(data))).catch(e => console.error(e));
+    if (filters.districtId) apiService.getZones(filters.districtId).then(data => setZones([...data].sort((a,b) => collator.compare(a.name, b.name))));
     else setZones([]);
   }, [filters.districtId]);
 
   useEffect(() => {
-    if (filters.zoneId) apiService.getAreas(filters.zoneId).then(data => setAreas(sortByName(data))).catch(e => console.error(e));
+    if (filters.zoneId) apiService.getAreas(filters.zoneId).then(data => setAreas([...data].sort((a,b) => collator.compare(a.name, b.name))));
     else setAreas([]);
   }, [filters.zoneId]);
 
   useEffect(() => {
-    if (filters.areaId) apiService.getChapters(filters.areaId).then(data => setChapters(sortByName(data))).catch(e => console.error(e));
+    if (filters.areaId) apiService.getChapters(filters.areaId).then(data => setChapters([...data].sort((a,b) => collator.compare(a.name, b.name))));
     else setChapters([]);
   }, [filters.areaId]);
 
