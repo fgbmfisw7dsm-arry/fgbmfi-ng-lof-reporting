@@ -139,25 +139,25 @@ const ReportsPage: React.FC = () => {
         nextLevelUnits = orgRegistry.chapters.filter(c => c.areaId === filters.areaId);
         currentScopeUnitId = filters.areaId;
         currentScopeRole = Role.FIELD_REPRESENTATIVE;
-        currentScopeName = "Area HQ Events";
+        currentScopeName = "Area Events";
     } else if (filters.zoneId) {
         groupBy = 'area';
         nextLevelUnits = orgRegistry.areas.filter(a => a.zoneId === filters.zoneId);
         currentScopeUnitId = filters.zoneId;
         currentScopeRole = Role.NATIONAL_DIRECTOR;
-        currentScopeName = "Zonal HQ Events";
+        currentScopeName = "Zonal Events";
     } else if (filters.districtId) {
         groupBy = 'zone';
         nextLevelUnits = orgRegistry.zones.filter(z => z.districtId === filters.districtId);
         currentScopeUnitId = filters.districtId;
         currentScopeRole = Role.DISTRICT_COORDINATOR;
-        currentScopeName = "District HQ Events";
+        currentScopeName = "District Events";
     } else if (filters.regionId) {
         groupBy = 'district';
         nextLevelUnits = orgRegistry.districts.filter(d => d.regionId === filters.regionId);
         currentScopeUnitId = filters.regionId;
         currentScopeRole = Role.REGIONAL_VICE_PRESIDENT;
-        currentScopeName = "Regional HQ Events";
+        currentScopeName = "Regional Events";
     } else if (user) {
         switch (user.role) {
             case Role.FIELD_REPRESENTATIVE:
@@ -165,14 +165,14 @@ const ReportsPage: React.FC = () => {
                  nextLevelUnits = orgRegistry.chapters.filter(c => c.areaId === user.unitId);
                  currentScopeUnitId = user.unitId;
                  currentScopeRole = Role.FIELD_REPRESENTATIVE;
-                 currentScopeName = "Area HQ Events";
+                 currentScopeName = "Area Events";
                  break;
             case Role.NATIONAL_DIRECTOR:
                  groupBy = 'area';
                  nextLevelUnits = orgRegistry.areas.filter(a => a.zoneId === user.unitId);
                  currentScopeUnitId = user.unitId;
                  currentScopeRole = Role.NATIONAL_DIRECTOR;
-                 currentScopeName = "Zonal HQ Events";
+                 currentScopeName = "Zonal Events";
                  break;
             case Role.DISTRICT_COORDINATOR:
             case Role.DISTRICT_ADMIN:
@@ -180,7 +180,7 @@ const ReportsPage: React.FC = () => {
                  nextLevelUnits = orgRegistry.zones.filter(z => z.districtId === user.unitId);
                  currentScopeUnitId = user.unitId;
                  currentScopeRole = Role.DISTRICT_COORDINATOR;
-                 currentScopeName = "District HQ Events";
+                 currentScopeName = "District Events";
                  break;
             case Role.REGIONAL_VICE_PRESIDENT:
             case Role.REGIONAL_ADMIN:
@@ -188,7 +188,7 @@ const ReportsPage: React.FC = () => {
                  nextLevelUnits = orgRegistry.districts.filter(d => d.regionId === user.unitId);
                  currentScopeUnitId = user.unitId;
                  currentScopeRole = Role.REGIONAL_VICE_PRESIDENT;
-                 currentScopeName = "Regional HQ Events";
+                 currentScopeName = "Regional Events";
                  break;
             case Role.CHAPTER_PRESIDENT:
                  groupBy = 'none' as any;
@@ -201,7 +201,7 @@ const ReportsPage: React.FC = () => {
                  nextLevelUnits = orgRegistry.regions;
                  currentScopeUnitId = 'national';
                  currentScopeRole = Role.NATIONAL_PRESIDENT;
-                 currentScopeName = "National HQ Events";
+                 currentScopeName = "National Events";
                  break;
         }
     }
