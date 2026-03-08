@@ -114,6 +114,15 @@ export const apiService = {
       return true;
   },
 
+  adminResetPassword: async (userId: string) => {
+      const { error } = await supabase.rpc('admin_reset_password', {
+          target_user_id: userId,
+          new_password: '123456'
+      });
+      if (error) throw error;
+      return true;
+  },
+
   getRegions: async (): Promise<Region[]> => {
     const { data, error } = await supabase.from('regions').select('*').limit(REGISTRY_LIMIT).order('name');
     if (error) throw new Error(`Region Sync Error: ${error.message}`);

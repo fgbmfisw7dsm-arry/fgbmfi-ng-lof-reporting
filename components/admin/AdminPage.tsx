@@ -6,10 +6,11 @@ import { apiService } from '../../services/apiService';
 import UserManagementSection from './sections/UserManagementSection';
 import OrgSetupSection from './sections/OrgSetupSection';
 import MaintenanceSection from './sections/MaintenanceSection';
+import AdminManualPage from '../support/AdminManualPage';
 
 const AdminPage: React.FC = () => {
   const { user } = useContext(AuthContext);
-  const [activeTab, setActiveTab] = useState<'users' | 'org' | 'maintenance'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'org' | 'maintenance' | 'manual'>('users');
   const [users, setUsers] = useState<User[]>([]);
   const [orgData, setOrgData] = useState({
       regions: [] as Region[],
@@ -69,6 +70,7 @@ const AdminPage: React.FC = () => {
             <button onClick={() => setActiveTab('users')} className={tabClass('users')}>User Management</button>
             <button onClick={() => setActiveTab('org')} className={tabClass('org')}>Organizational Setup</button>
             <button onClick={() => setActiveTab('maintenance')} className={tabClass('maintenance')}>Maintenance</button>
+            <button onClick={() => setActiveTab('manual')} className={tabClass('manual')}>Admin Manual</button>
         </nav>
       </div>
       <div className="mt-4">
@@ -82,6 +84,7 @@ const AdminPage: React.FC = () => {
                 {activeTab === 'users' && <UserManagementSection orgData={orgData} users={users} setUsers={setUsers} />}
                 {activeTab === 'org' && <OrgSetupSection orgData={orgData} setOrgData={setOrgData} users={users} setUsers={setUsers} forceRefresh={forceUpdate} />}
                 {activeTab === 'maintenance' && <MaintenanceSection forceUpdate={forceUpdate} />}
+                {activeTab === 'manual' && <AdminManualPage />}
             </>
         )}
       </div>

@@ -131,6 +131,24 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
         }
     };
 
+    const handleResetPassword = async (userId: string, userName: string) => {
+        setIsLoading(true);
+        setStatusNote(null);
+        try {
+            await apiService.adminResetPassword(userId);
+            setStatusNote({ msg: `Password for ${userName} has been reset to '123456'.`, type: 'success' });
+        } catch (error: any) {
+            console.error("Password reset failure:", error);
+            setStatusNote({ 
+                msg: `Password Reset Failed: ${error.message}. Ensure you have run the required SQL script in your Supabase Dashboard.`, 
+                type: 'error',
+                showFix: true
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const getUnitName = (user: User) => {
         if (user.unitId === 'national') return 'National HQ';
         const list = (() => {
@@ -173,8 +191,8 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
                     {statusNote.showFix && (
                         <div className="mt-3 p-3 bg-white/50 rounded-xl border border-red-100 text-[10px] text-red-900 leading-relaxed font-medium">
                             <p className="font-black text-[11px] mb-1">🔧 HOW TO FIX THIS:</p>
-                            To authorize deletions, your Admin account needs a "DELETE Policy" in Supabase. 
-                            Please run the SQL command provided in the technical manual in your Supabase SQL Editor to enable officer removal.
+                            Your Admin account may be missing the required database permissions (RPC or RLS Policies) in Supabase. 
+                            Please ensure you have run the latest SQL scripts provided in the technical manual in your Supabase SQL Editor.
                         </div>
                     )}
                 </div>
@@ -228,6 +246,16 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
                                 </td>
                                 <td className="px-6 py-4 text-xs font-bold text-gray-500">{getUnitName(u)}</td>
                                 <td className="px-6 py-4 text-right space-x-4">
+                                    {!showArchived && (
+                                        <button 
+                                            onClick={() => handleResetPassword(u.id, u.name)} 
+                                            disabled={isLoading}
+                                            className="text-[10px] font-black uppercase text-orange-500 hover:text-orange-700 disabled:opacity-30"
+                                            title="Reset user password to 123456"
+                                        >
+                                            Reset
+                                        </button>
+                                    )}
                                     <button 
                                         onClick={() => { setEditingUser(u); setModalOpen(true); }} 
                                         className={`text-[10px] font-black uppercase ${showArchived ? 'text-orange-600 hover:underline' : 'text-fgbmfi-blue hover:underline'}`}
