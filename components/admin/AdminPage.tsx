@@ -65,8 +65,8 @@ const AdminPage: React.FC = () => {
   return (
     <div>
       <h1 className="text-3xl font-bold text-gray-800 mb-6">Admin Panel</h1>
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="-mb-px flex space-x-8">
+      <div className="border-b border-gray-200 mb-6 overflow-x-auto scrollbar-hide">
+        <nav className="-mb-px flex space-x-8 whitespace-nowrap min-w-max px-1">
             <button onClick={() => setActiveTab('users')} className={tabClass('users')}>User Management</button>
             <button onClick={() => setActiveTab('org')} className={tabClass('org')}>Organizational Setup</button>
             <button onClick={() => setActiveTab('maintenance')} className={tabClass('maintenance')}>Maintenance</button>
