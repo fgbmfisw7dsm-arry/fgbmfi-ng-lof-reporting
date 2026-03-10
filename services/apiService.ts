@@ -1,5 +1,6 @@
 import { Role, DashboardStats, ChapterMonthlyReport, EventReport, User, Region, District, Zone, Area, Chapter, EventType } from '../types';
-import { supabase } from './supabaseClient';
+import { supabase, supabaseUrl, supabaseKey } from './supabaseClient';
+import { createClient } from '@supabase/supabase-js';
 
 const REGISTRY_LIMIT = 10000;
 
@@ -37,17 +38,30 @@ export const apiService = {
   },
 
   createNewUserAuth: async (email: string) => {
-      const { data, error } = await supabase.auth.signUp({
+      // Create a temporary, isolated client that DOES NOT persist session
+      // This allows us to use the official signUp (which fixes schema errors)
+      // WITHOUT logging out the Administrator.
+      const tempSupabase = createClient(supabaseUrl, supabaseKey, {
+          auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+              detectSessionInUrl: false
+          }
+      });
+
+      const { data, error } = await tempSupabase.auth.signUp({
           email,
-          password: '123456', 
+          password: '123456',
           options: { 
             data: { is_managed: true } 
           }
       });
+      
       if (error) {
           if (error.message.toLowerCase().includes('already registered')) throw new Error("ALREADY_EXISTS");
           throw error;
       }
+      
       return data.user;
   },
 

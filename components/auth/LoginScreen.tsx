@@ -36,12 +36,13 @@ const LoginScreen: React.FC = () => {
       timeoutRef.current = window.setTimeout(() => {
         setShowReset(true);
       }, 10000); 
-    } else {
+    } else if (!error) {
+      // Only hide if there's no error. If there is an error, keep it visible for recovery.
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       setShowReset(false);
     }
     return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
-  }, [isLoading]);
+  }, [isLoading, error]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +54,7 @@ const LoginScreen: React.FC = () => {
         if (isLoading) {
             setError("The cloud connection is taking longer than expected. Please check your internet or try the 'Reset Connection' button below.");
             setIsLoading(false);
+            setShowReset(true);
         }
     }, 15000);
 
@@ -64,6 +66,7 @@ const LoginScreen: React.FC = () => {
         console.error("LoginScreen: Login error:", err);
         setError(err.message || 'Login failed. Check your credentials.');
         setIsLoading(false);
+        setShowReset(true); // Ensure reset is available on failure
     } finally {
         window.clearTimeout(loginTimeout);
     }
@@ -77,6 +80,14 @@ const LoginScreen: React.FC = () => {
   const handleClearLocalStorage = () => {
     localStorage.clear();
     sessionStorage.clear();
+    // Clear all cookies
+    const cookies = document.cookie.split(";");
+    for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i];
+        const eqPos = cookie.indexOf("=");
+        const name = eqPos > -1 ? cookie.substring(0, eqPos) : cookie;
+        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+    }
   };
 
   return (
