@@ -507,6 +507,7 @@ export const apiService = {
   submitChapterReport: async (r: any) => {
       return apiService.submitEventReport({
           ...r,
+          unitId: r.unitId || r.chapterId,
           dateOfEvent: `${r.year}-${String(r.month).padStart(2, '0')}-01`,
           eventType: 'Chapter Meeting'
       });

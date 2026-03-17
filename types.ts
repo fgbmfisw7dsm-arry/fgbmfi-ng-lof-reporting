@@ -72,6 +72,7 @@ export interface EventReport {
   offering: number;
   membershipIntention: number;
   membershipCount?: number; // Added for Chapter reports
+  chapterId?: string; // Legacy support
   isLegacy?: boolean;
 }
 
