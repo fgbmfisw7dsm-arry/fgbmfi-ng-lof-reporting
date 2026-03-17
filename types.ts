@@ -75,6 +75,12 @@ export interface EventReport {
   isLegacy?: boolean;
 }
 
+// Legacy type to prevent build errors from phantom files
+export interface ChapterMonthlyReport extends EventReport {
+  month: string;
+  year: number;
+}
+
 export interface DashboardStats {
   totalAttendance: number;
   totalFirstTimers: number;

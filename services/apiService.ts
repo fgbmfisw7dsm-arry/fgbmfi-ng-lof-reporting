@@ -503,5 +503,14 @@ export const apiService = {
     if (error) throw error;
   },
 
+  // Legacy function to prevent build errors from phantom files
+  submitChapterReport: async (r: any) => {
+      return apiService.submitEventReport({
+          ...r,
+          dateOfEvent: `${r.year}-${String(r.month).padStart(2, '0')}-01`,
+          eventType: 'Chapter Meeting'
+      });
+  },
+
   clearAllData: () => supabase.from('event_reports').delete().neq('id', '0')
 };
