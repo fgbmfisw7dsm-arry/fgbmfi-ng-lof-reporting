@@ -6,7 +6,7 @@ import { AuthProvider } from './context/AuthProvider';
 import { AuthContext } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 
-// Build fix: Neutralizing phantom legacy files causing Vercel deployment errors
+// Build fix: Neutralizing phantom legacy files causing Vercel deployment errors (v2)
 const AppContent: React.FC = () => {
   const { user } = useContext(AuthContext);
   return (
