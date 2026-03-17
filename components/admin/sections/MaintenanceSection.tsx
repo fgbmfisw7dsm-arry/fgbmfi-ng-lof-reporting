@@ -52,7 +52,6 @@ const MaintenanceSection: React.FC<{ forceUpdate: () => void }> = ({ forceUpdate
             setArchivedSuccessfully(true);
             setStatusMessage({ text: `Archive confirmed for ${scope.toUpperCase()} scope (${fromYear}-${toYear}). Scoped wipe is now available for this selection.`, type: 'success' });
             refreshData();
-            forceUpdate();
         } catch (e: any) {
             setStatusMessage({ text: `Archival failed: ${e.message}`, type: 'error' });
         } finally {
@@ -69,7 +68,6 @@ const MaintenanceSection: React.FC<{ forceUpdate: () => void }> = ({ forceUpdate
             setStatusMessage({ text: `Data wipe complete for ${scope.toUpperCase()} (${fromYear}-${toYear}). Records removed from cloud registry.`, type: 'success' });
             setArchivedSuccessfully(false); // Reset to force new archive before next wipe
             refreshData();
-            forceUpdate();
         } catch (e: any) {
             setStatusMessage({ text: `Wipe failed: ${e.message}`, type: 'error' });
         } finally {
@@ -84,7 +82,6 @@ const MaintenanceSection: React.FC<{ forceUpdate: () => void }> = ({ forceUpdate
             await apiService.clearAllData();
             setStatusMessage({ text: 'The entire organization registry has been wiped clean.', type: 'success' });
             refreshData();
-            forceUpdate();
         } catch (e: any) {
             setStatusMessage({ text: `Global wipe failed: ${e.message}`, type: 'error' });
         } finally {

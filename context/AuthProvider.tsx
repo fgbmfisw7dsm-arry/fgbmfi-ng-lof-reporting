@@ -17,7 +17,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log("AuthProvider: Fetching profile for ID:", id);
       
       const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Profile fetch timed out")), 8000);
+          setTimeout(() => reject(new Error("Profile fetch timed out")), 45000); // Increased to 45s
       });
 
       try {
@@ -56,7 +56,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   phone: data.phone || '',
                   password: '', 
                   role: data.role as Role,
-                  unitId: data.unit_id
+                  unitId: String(data.unit_id || '').trim().toUpperCase()
               });
               return 'FOUND';
           }
@@ -111,7 +111,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     phone: data.phone || '',
                     password: '', 
                     role: data.role as Role,
-                    unitId: data.unit_id
+                    unitId: String(data.unit_id || '').trim().toUpperCase()
                 });
             })
             .subscribe();
@@ -121,7 +121,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log(`AuthProvider: Auth Event [${event}] for ${session?.user?.email || 'no-user'}`);
         
         if (session?.user) {
-            const status = await fetchProfile(session.user.id);
+            let status = await fetchProfile(session.user.id);
+            
+            // Retry once if error (network glitch)
+            if (status === 'ERROR' && isMounted) {
+                console.warn("AuthProvider: Profile fetch failed, retrying in 3 seconds...");
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                if (!isMounted) return;
+                status = await fetchProfile(session.user.id);
+            }
+
             if (!isMounted) return;
 
             if (status === 'MISSING') {
@@ -129,6 +138,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 await supabase.auth.signOut();
             } else if (status === 'FOUND') {
                 setupProfileSubscription(session.user.id);
+            } else if (status === 'ERROR') {
+                // If still error after retry, we might want to stay in loading or show error
+                console.error("AuthProvider: Profile fetch failed after retry.");
             }
         } else {
             setCurrentUser(null);
@@ -139,6 +151,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Initial session check
     supabase.auth.getSession().then(({ data: { session } }) => {
+        console.log("AuthProvider: Initial session check result:", session ? `Session for ${session.user.email}` : "No session found");
         if (isMounted) handleAuthStateChange('INITIAL_SESSION', session);
     });
 
@@ -169,30 +182,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [currentUser, fetchProfile]);
 
   const login = async (identifier: string, password: string): Promise<boolean> => {
-    // Create a timeout promise
+    console.log("AuthProvider: Starting login process for", identifier);
+    
+    const loginTimeout = 60000; // Increased to 60 seconds
     const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Cloud authentication timed out. Please check your connection.")), 12000);
+        setTimeout(() => reject(new Error("Cloud authentication timed out. Please check your connection.")), loginTimeout);
     });
 
-    try {
+    const loginLogic = async () => {
         let loginEmail = identifier;
+        
         if (!identifier.includes('@')) {
             console.log("AuthProvider: Resolving email for username:", identifier);
-            const { data: profile } = await supabase
+            const { data: profile, error: profileError } = await supabase
                 .from('profiles')
                 .select('email')
                 .eq('username', identifier)
                 .single();
-            if (profile) loginEmail = profile.email;
+            
+            if (profileError) {
+                console.error("AuthProvider: Username resolution error:", profileError);
+                if (profileError.code === 'PGRST116') {
+                    throw new Error("Username not found. Please check your credentials.");
+                }
+                throw profileError;
+            }
+            if (profile) {
+                loginEmail = profile.email;
+                console.log("AuthProvider: Username resolved to", loginEmail);
+            }
         }
 
-        console.log("AuthProvider: Signing in with email:", loginEmail);
-        const signInPromise = supabase.auth.signInWithPassword({
+        console.log("AuthProvider: Executing signInWithPassword for", loginEmail);
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
             email: loginEmail,
             password: password,
         });
-
-        const { data: authData, error: authError } = await Promise.race([signInPromise, timeoutPromise]) as any;
 
         if (authError) {
             console.error("AuthProvider: signInWithPassword error:", authError);
@@ -200,7 +225,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
 
         if (authData.user) {
-            console.log("AuthProvider: Auth successful, fetching profile...");
+            console.log("AuthProvider: Auth successful, fetching profile for UID:", authData.user.id);
             const status = await fetchProfile(authData.user.id);
             if (status === 'MISSING') {
                 throw new Error("Profile not found. Please contact your Administrator to activate your account.");
@@ -209,6 +234,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
         }
         return true;
+    };
+
+    try {
+        return await Promise.race([loginLogic(), timeoutPromise]) as boolean;
     } catch (e: any) {
         console.error("AuthProvider: Login process exception:", e.message);
         throw e;
@@ -216,13 +245,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const updateUser = async (updatedUser: User) => {
+    const normalizedUnitId = String(updatedUser.unitId || '').trim().toUpperCase();
     const { error } = await supabase.from('profiles').update({
         name: updatedUser.name,
         phone: updatedUser.phone,
         role: updatedUser.role,
-        unit_id: updatedUser.unitId
+        unit_id: normalizedUnitId
     }).eq('id', updatedUser.id);
-    if (!error) setCurrentUser(updatedUser);
+    if (!error) setCurrentUser({ ...updatedUser, unitId: normalizedUnitId });
   };
 
   const authContextValue = useMemo(() => ({
@@ -236,6 +266,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 flex-col space-y-4">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-fgbmfi-blue"></div>
         <div className="text-fgbmfi-blue font-semibold tracking-tight">Syncing Cloud Identity...</div>
+        <button 
+            onClick={() => window.location.reload()}
+            className="text-[10px] text-gray-400 font-bold uppercase tracking-widest hover:text-fgbmfi-blue transition-colors"
+        >
+            Taking too long? Click to refresh
+        </button>
     </div>
   );
 

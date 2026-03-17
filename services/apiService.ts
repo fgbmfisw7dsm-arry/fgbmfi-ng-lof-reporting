@@ -1,4 +1,4 @@
-import { Role, DashboardStats, ChapterMonthlyReport, EventReport, User, Region, District, Zone, Area, Chapter, EventType } from '../types';
+import { Role, DashboardStats, EventReport, User, Region, District, Zone, Area, Chapter, EventType } from '../types';
 import { supabase, supabaseUrl, supabaseKey } from './supabaseClient';
 import { createClient } from '@supabase/supabase-js';
 
@@ -211,6 +211,34 @@ export const apiService = {
     if (error) throw new Error(`Event Types Sync Error: ${error.message}`);
     return data || [];
   },
+  updateEventReport: async (report: EventReport) => {
+    const reportId = String(report.id).trim();
+    if (!reportId) {
+      throw new Error("Update failed: Missing report ID.");
+    }
+
+    const { error, status } = await supabase
+      .from('event_reports')
+      .update({
+        event_type: report.eventType,
+        date_of_event: report.dateOfEvent,
+        attendance: Number(report.attendance || 0),
+        first_timers: Number(report.firstTimers || 0),
+        salvations: Number(report.salvations || 0),
+        holy_ghost_baptism: Number(report.holyGhostBaptism || 0),
+        membership_intention: Number(report.membershipIntention || 0),
+        offering: Number(report.offering || 0),
+        membership_count: Number(report.membershipCount || 0)
+      })
+      .eq('id', reportId);
+    
+    if (error) {
+      console.error('Supabase Update Error:', error);
+      throw new Error(`Cloud Sync Error: ${error.message} (Status: ${status})`);
+    }
+
+    return 'SUCCESS';
+  },
   upsertEventType: async (et: EventType) => {
     const { error } = await supabase.from('event_types').upsert({ id: et.id, name: et.name }, { onConflict: 'id' });
     if (error) throw error;
@@ -281,7 +309,6 @@ export const apiService = {
         apiService.getZones(),
         apiService.getAreas(),
         apiService.getChapters(),
-        supabase.from('chapter_reports').select('*').in('chapter_id', chapterIds).eq('year', year).limit(REGISTRY_LIMIT),
         supabase.from('event_reports').select('*').in('unit_id', descendantIds).gte('date_of_event', `${year}-01-01`).lte('date_of_event', `${year}-12-31`).limit(REGISTRY_LIMIT)
     ]);
 
@@ -290,27 +317,36 @@ export const apiService = {
     const zones = results[2] as Zone[];
     const areas = results[3] as Area[];
     const chaps = results[4] as Chapter[];
-    const allMonthly = (results[5].data as any[]) || [];
-    const allEvents = (results[6].data as any[]) || [];
+    const allEvents = (results[5].data as any[]) || [];
 
     const stats = { totalAttendance: 0, totalFirstTimers: 0, totalSalvations: 0, totalHolyGhostBaptisms: 0, totalOfferings: 0, totalMembershipCount: 0, totalMembershipIntentions: 0 };
-    allMonthly.forEach(r => {
-        stats.totalAttendance += (r.attendance || 0); stats.totalFirstTimers += (r.first_timers || 0);
-        stats.totalSalvations += (r.salvations || 0); stats.totalHolyGhostBaptisms += (r.holy_ghost_baptism || 0);
-        stats.totalOfferings += Number(r.offering || 0); stats.totalMembershipCount += (r.membership_count || 0);
-        stats.totalMembershipIntentions += (r.membership_intention || 0);
-    });
+    
+    // Membership logic: Latest value per chapter
+    const latestMembershipByChapter: { [chapterId: string]: { date: number, count: number } } = {};
+
     allEvents.forEach(r => {
         stats.totalAttendance += (r.attendance || 0); stats.totalFirstTimers += (r.first_timers || 0);
         stats.totalSalvations += (r.salvations || 0); stats.totalHolyGhostBaptisms += (r.holy_ghost_baptism || 0);
         stats.totalOfferings += Number(r.offering || 0); stats.totalMembershipIntentions += (r.membership_intention || 0);
+        
+        // Track latest membership from events if applicable (some events might have membership count)
+        const reportDate = new Date(r.date_of_event).getTime();
+        const uid = r.unit_id.trim().toUpperCase();
+        // Only consider it if it's a chapter (descendantIds includes chapters)
+        if (chapterIds.includes(uid) && r.membership_count > 0) {
+            if (!latestMembershipByChapter[uid] || reportDate > latestMembershipByChapter[uid].date) {
+                latestMembershipByChapter[uid] = { date: reportDate, count: r.membership_count };
+            }
+        }
     });
+
+    // Sum up latest membership counts
+    stats.totalMembershipCount = Object.values(latestMembershipByChapter).reduce((sum, item) => sum + item.count, 0);
 
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const growthTrend = months.map(m => ({ 
         name: m.substring(0, 3), 
-        value: (allMonthly.filter(r => r.month === m).reduce((sum, r) => sum + (r.attendance || 0), 0) || 0) +
-               (allEvents.filter(r => new Date(r.date_of_event).toLocaleString('default', { month: 'long' }) === m).reduce((sum, r) => sum + (r.attendance || 0), 0) || 0)
+        value: allEvents.filter(r => new Date(r.date_of_event).toLocaleString('default', { month: 'long' }) === m).reduce((sum, r) => sum + (r.attendance || 0), 0) || 0
     }));
 
     const breakdown: any[] = [];
@@ -342,9 +378,8 @@ export const apiService = {
         };
         if (chaps.some(c => c.id.trim().toUpperCase() === normTarget)) targetChapters.push(normTarget);
         else localCrawl(targetId);
-        const mTotal = allMonthly.filter(r => targetChapters.includes(r.chapter_id.trim().toUpperCase())).reduce((sum, r) => sum + (r.attendance || 0), 0);
         const eTotal = allEvents.filter(r => targetDescendants.includes(r.unit_id.trim().toUpperCase())).reduce((sum, r) => sum + (r.attendance || 0), 0);
-        return mTotal + eTotal;
+        return eTotal;
     };
 
     const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
@@ -372,14 +407,36 @@ export const apiService = {
         }
     }
 
-    const { chapterIds } = await apiService.getAllDescendantIds(targetUnitId);
-    let q = supabase.from('chapter_reports').select('*').limit(REGISTRY_LIMIT);
-    if (chapterIds.length > 0) q = q.in('chapter_id', chapterIds);
-    else q = q.eq('chapter_id', 'NONE');
-    if (f.startDate) q = q.gte('year', new Date(f.startDate).getFullYear());
-    if (f.endDate) q = q.lte('year', new Date(f.endDate).getFullYear());
-    const { data } = await q.order('year', { ascending: false }).order('month', { ascending: false });
-    return (data || []).map(r => ({ id: r.id, chapterId: r.chapter_id, month: r.month, year: r.year, membershipCount: r.membership_count || 0, attendance: r.attendance || 0, firstTimers: r.first_timers || 0, salvations: r.salvations || 0, holyGhostBaptism: r.holy_ghost_baptism || 0, membershipIntention: r.membership_intention || 0, offering: Number(r.offering || 0) }));
+    const { descendantIds } = await apiService.getAllDescendantIds(targetUnitId);
+    
+    const { data: eventRes, error } = await supabase.from('event_reports').select('*').in('unit_id', descendantIds).limit(REGISTRY_LIMIT);
+    if (error) throw error;
+
+    const eventData = (eventRes || []).map(r => {
+        const d = new Date(r.date_of_event);
+        return {
+            id: r.id,
+            chapterId: r.unit_id,
+            month: d.toLocaleString('default', { month: 'long' }),
+            year: d.getFullYear(),
+            membershipCount: r.membership_count || 0,
+            attendance: r.attendance || 0,
+            firstTimers: r.first_timers || 0,
+            salvations: r.salvations || 0,
+            holyGhostBaptism: r.holy_ghost_baptism || 0,
+            membershipIntention: r.membership_intention || 0,
+            offering: Number(r.offering || 0),
+            date: d,
+            isEvent: true,
+            eventType: r.event_type
+        };
+    });
+
+    let filtered = eventData;
+    if (f.startDate) filtered = filtered.filter(r => r.date >= new Date(f.startDate));
+    if (f.endDate) filtered = filtered.filter(r => r.date <= new Date(f.endDate));
+
+    return filtered.sort((a, b) => b.date.getTime() - a.date.getTime());
   },
 
   getEventReports: async (f: any, user?: User) => {
@@ -400,7 +457,10 @@ export const apiService = {
     else q = q.eq('unit_id', 'NONE');
     if (f.startDate) q = q.gte('date_of_event', f.startDate);
     if (f.endDate) q = q.lte('date_of_event', f.endDate);
-    const { data } = await q.order('date_of_event', { ascending: false });
+    if (f.reportingOfficerId) q = q.eq('reporting_officer_id', f.reportingOfficerId);
+    const { data, error } = await q.order('date_of_event', { ascending: false });
+    if (error) throw error;
+
     return (data || []).map(r => ({ 
         id: r.id, 
         reportingOfficerId: r.reporting_officer_id, 
@@ -413,32 +473,16 @@ export const apiService = {
         salvations: r.salvations || 0, 
         holyGhostBaptism: r.holy_ghost_baptism || 0, 
         membershipIntention: r.membership_intention || 0, 
-        offering: Number(r.offering || 0) 
+        offering: Number(r.offering || 0),
+        membershipCount: r.membership_count || 0
     }));
   },
 
   archiveReportsByScope: async (scope: any, unitId: string, fromYear: number, toYear: number) => ({ success: true }),
   deleteReportsByScope: async (scope: any, unitId: string, fromYear: number, toYear: number) => {
-      const { descendantIds, chapterIds } = await apiService.getAllDescendantIds(unitId);
-      if (chapterIds.length > 0) await supabase.from('chapter_reports').delete().in('chapter_id', chapterIds).gte('year', fromYear).lte('year', toYear);
+      const { descendantIds } = await apiService.getAllDescendantIds(unitId);
       if (descendantIds.length > 0) await supabase.from('event_reports').delete().in('unit_id', descendantIds).gte('date_of_event', `${fromYear}-01-01`).lte('date_of_event', `${toYear}-12-31`);
       return { success: true };
-  },
-
-  submitChapterReport: async (r: any) => {
-    const { error } = await supabase.from('chapter_reports').insert({ 
-        chapter_id: r.chapterId.trim().toUpperCase(), 
-        month: r.month, 
-        year: r.year, 
-        membership_count: r.membershipCount, 
-        attendance: r.attendance, 
-        first_timers: r.first_timers, 
-        salvations: r.salvations, 
-        holy_ghost_baptism: r.holy_ghost_baptism, 
-        membership_intention: r.membership_intention, 
-        offering: r.offering 
-    });
-    if (error) throw error;
   },
 
   submitEventReport: async (r: any) => {
@@ -448,15 +492,16 @@ export const apiService = {
         officer_role: r.officerRole, 
         date_of_event: r.dateOfEvent, 
         event_type: r.eventType, 
-        attendance: r.attendance, 
-        first_timers: r.first_timers, 
-        salvations: r.salvations, 
-        holy_ghost_baptism: r.holy_ghost_baptism, 
-        membership_intention: r.membership_intention, 
-        offering: r.offering 
+        attendance: Number(r.attendance || 0), 
+        first_timers: Number(r.firstTimers || 0), 
+        salvations: Number(r.salvations || 0), 
+        holy_ghost_baptism: Number(r.holyGhostBaptism || 0), 
+        membership_intention: Number(r.membershipIntention || 0), 
+        membership_count: Number(r.membershipCount || 0),
+        offering: Number(r.offering || 0) 
     });
     if (error) throw error;
   },
 
-  clearAllData: () => Promise.all([supabase.from('chapter_reports').delete().neq('id', '0'), supabase.from('event_reports').delete().neq('id', '0')])
+  clearAllData: () => supabase.from('event_reports').delete().neq('id', '0')
 };

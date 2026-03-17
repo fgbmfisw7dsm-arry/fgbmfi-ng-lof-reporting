@@ -2,6 +2,7 @@ import React, { useState, useContext, useEffect, useRef } from 'react';
 import { AuthContext } from '../../context/AuthContext';
 import Icon from '../ui/Icon';
 import { LOGO_BASE64, ROLES } from '../../constants';
+import { supabase } from '../../services/supabaseClient';
 import { apiService } from '../../services/apiService';
 import { Role } from '../../types';
 
@@ -32,6 +33,24 @@ const LoginScreen: React.FC = () => {
   });
 
   useEffect(() => {
+    // Connectivity check on mount
+    const checkConnectivity = async () => {
+        try {
+            const { error } = await supabase.from('profiles').select('id').limit(1);
+            if (error && error.code !== 'PGRST116') {
+                console.warn("LoginScreen: Initial connectivity check returned error:", error);
+            } else {
+                console.log("LoginScreen: Supabase connectivity verified.");
+            }
+        } catch (e) {
+            console.error("LoginScreen: Supabase connectivity check failed:", e);
+            setError("Cannot reach cloud database. Please check your internet connection or VPN settings.");
+        }
+    };
+    checkConnectivity();
+  }, []);
+
+  useEffect(() => {
     if (isLoading) {
       timeoutRef.current = window.setTimeout(() => {
         setShowReset(true);
@@ -56,9 +75,15 @@ const LoginScreen: React.FC = () => {
             setIsLoading(false);
             setShowReset(true);
         }
-    }, 15000);
+    }, 65000); // Increased to 65s (slightly more than AuthProvider's 60s)
 
     try {
+        console.log("LoginScreen: Performing pre-login connectivity check...");
+        const { error: connError } = await supabase.from('profiles').select('id').limit(1);
+        if (connError && connError.code !== 'PGRST116') {
+            console.warn("LoginScreen: Pre-login check failed:", connError);
+        }
+
         console.log("LoginScreen: Attempting login for", identifier);
         await login(identifier, password);
         console.log("LoginScreen: Login call returned successfully.");
@@ -72,7 +97,12 @@ const LoginScreen: React.FC = () => {
     }
   };
 
-  const handleResetConnection = () => {
+  const handleResetConnection = async () => {
+    try {
+        await logout();
+    } catch (e) {
+        console.warn("Reset: Logout failed, continuing with local clear", e);
+    }
     handleClearLocalStorage();
     window.location.reload();
   };

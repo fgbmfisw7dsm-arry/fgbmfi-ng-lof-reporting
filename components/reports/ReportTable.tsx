@@ -1,20 +1,24 @@
-
 import React from 'react';
-import { ChapterMonthlyReport } from '../../types';
 
 interface ReportTableProps {
-  data: Partial<ChapterMonthlyReport & { name?: string; isTotal?: boolean }>[];
+  data: any[];
   isAggregated?: boolean;
 }
 
 const ReportTable: React.FC<ReportTableProps> = ({ data, isAggregated = false }) => {
   const headers = isAggregated 
     ? ['Name', 'Membership', 'Attendance', 'First Timers', 'Salvations', 'H.G. Baptism', 'Membership Intentions', 'Offering (₦)']
-    : ['Month', 'Year', 'Membership', 'Attendance', 'First Timers', 'Salvations', 'H.G. Baptism', 'Membership Intentions', 'Offering (₦)'];
+    : ['Date/Period', 'Membership', 'Attendance', 'First Timers', 'Salvations', 'H.G. Baptism', 'Membership Intentions', 'Offering (₦)'];
 
   if (data.length === 0) {
     return <div className="bg-white p-8 rounded-lg shadow-md text-center text-gray-500">No report data available.</div>;
   }
+
+  const formatDate = (date: any) => {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-x-auto">
@@ -37,10 +41,16 @@ const ReportTable: React.FC<ReportTableProps> = ({ data, isAggregated = false })
                     {report.name || 'Summary'}
                 </td>
               ) : (
-                <>
-                    <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{report.month}</td>
-                    <td className="px-6 py-4">{report.year}</td>
-                </>
+                <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
+                    {(report as any).isEvent ? (
+                        <div className="flex flex-col">
+                            <span className="text-fgbmfi-blue font-black">{formatDate((report as any).date)}</span>
+                            <span className="text-[9px] uppercase tracking-tighter text-gray-400">{(report as any).eventType}</span>
+                        </div>
+                    ) : (
+                        <span className="font-bold">{report.month} {report.year}</span>
+                    )}
+                </td>
               )}
               <td className="px-6 py-4">{report.membershipCount?.toLocaleString()}</td>
               <td className="px-6 py-4">{report.attendance?.toLocaleString()}</td>

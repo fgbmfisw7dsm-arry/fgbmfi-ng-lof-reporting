@@ -82,28 +82,27 @@ const UserManualPage: React.FC = () => {
         y += 5;
 
         addSectionTitle("3. Submitting Reports (My Forms)");
-        addParagraph("Navigate to the 'My Forms' tab in the sidebar to submit data.");
+        addParagraph("Navigate to the 'My Forms' tab in the sidebar to submit data. All data entry is now event-based to ensure accuracy.");
         
-        addSubTitle("For Chapter Presidents (CP)");
-        addBullet("Form: Chapter President Monthly Input Form.");
-        addBullet("Action: Select the Month and Year. Fill in data for Membership Count, Attendance, First Timers, Salvations, Holy Ghost Baptism, Membership Intention, and Offering.");
-        addBullet("Submit: Click Submit Report. Numeric fields auto-select when clicked.");
-
-        addSubTitle("For Other Officers (FR, ND, DC, RVP, NP)");
-        addBullet("Form: Event Data Form.");
-        addBullet("Action: Select the Date of Event and Event Type (e.g., Seminar, Rally). Fill in the outcome figures.");
-        addBullet("Submit: Click Submit Event Report.");
+        addSubTitle("Event Outcome Entry (All Officers)");
+        addBullet("Action: Select the Date of Event and Event Type (e.g., Seminar, Rally, Chapter Meeting).");
+        addBullet("Outcome Data: Fill in figures for Attendance, First Timers, Salvations, Holy Ghost Baptism, and Offering.");
+        addBullet("Chapter Presidents: You will see an additional 'Membership Count' field. Enter your current total chapter membership here.");
+        addBullet("Submit: Click Submit Event Report. Numeric fields auto-select when clicked for easier entry.");
         y += 5;
 
         addSectionTitle("4. Viewing Reports (My Reports)");
-        addParagraph("Navigate to the 'My Reports' tab to analyze data.");
+        addParagraph("Navigate to the 'My Reports' tab to analyze data. The system uses a 'Latest Snapshot' logic for membership counts.");
 
         addSubTitle("Aggregated Summary");
         addBullet("This table shows a roll-up of data for all units under your supervision.");
+        addBullet("Membership Logic: The 'Membership' column shows the sum of the LATEST reported count from each chapter in your scope.");
         addBullet("Scope Rows: Specific row for your own office's events combined with totals from subordinate units.");
-        addBullet("Totals: A highlighted TOTAL row at the bottom sums up all columns.");
 
-        addSubTitle("Filtering Data");
+        addSubTitle("Summary Events Matrix");
+        addBullet("View a heatmap of activity types (Seminars, Rallies, etc.) across your entire jurisdiction.");
+        addBullet("This view helps identify which event types are driving the most engagement.");
+        y += 5;
         addBullet("Date Range: Use the Start Date and End Date inputs to view reports within a specific period.");
         addBullet("Unit Filters: Use the dropdowns (Region, District, Zone, etc.) to drill down.");
 
@@ -168,31 +167,31 @@ const UserManualPage: React.FC = () => {
         </ul>
 
         <h2 style={{color: '#B71C1C', fontSize: '20px', marginTop: '24px', marginBottom: '12px', fontWeight: 'bold'}}>3. Submitting Reports (My Forms)</h2>
-        <p>Navigate to the <strong>My Forms</strong> tab in the sidebar to submit data.</p>
+        <p>Navigate to the <strong>My Forms</strong> tab in the sidebar to submit data. All data entry is now event-based to ensure accuracy.</p>
 
-        <h3 style={{fontSize: '18px', fontWeight: 'bold', marginTop: '16px', marginBottom: '8px'}}>For Chapter Presidents (CP)</h3>
+        <h3 style={{fontSize: '18px', fontWeight: 'bold', marginTop: '16px', marginBottom: '8px'}}>Event Outcome Entry (All Officers)</h3>
         <ul style={{marginLeft: '20px', listStyleType: 'disc'}}>
-            <li><strong>Form:</strong> Chapter President Monthly Input Form.</li>
-            <li><strong>Action:</strong> Select the <strong>Month</strong> and <strong>Year</strong>. Fill in data for Membership Count, Attendance, First Timers, Salvations, Holy Ghost Baptism, Membership Intention, and Offering.</li>
-            <li><strong>Submit:</strong> Click <strong>Submit Report</strong>.</li>
+            <li><strong>Action:</strong> Select the <strong>Date of Event</strong> and <strong>Event Type</strong> (e.g., Seminar, Rally, Chapter Meeting). Fill in the outcome figures.</li>
+            <li><strong>Chapter Presidents:</strong> You will see an additional <strong>Membership Count</strong> field. Enter your current total chapter membership here.</li>
+            <li><strong>Submit:</strong> Click <strong>Submit Event Report</strong>.</li>
             <li><em>Note: Numeric fields auto-select when clicked for easier typing.</em></li>
         </ul>
 
-        <h3 style={{fontSize: '18px', fontWeight: 'bold', marginTop: '16px', marginBottom: '8px'}}>For Other Officers (FR, ND, DC, RVP, NP)</h3>
-        <ul style={{marginLeft: '20px', listStyleType: 'disc'}}>
-            <li><strong>Form:</strong> Event Data Form.</li>
-            <li><strong>Action:</strong> Select the <strong>Date of Event</strong> and <strong>Event Type</strong> (e.g., Seminar, Rally). Fill in the outcome figures.</li>
-            <li><strong>Submit:</strong> Click <strong>Submit Event Report</strong>.</li>
-        </ul>
-
         <h2 style={{color: '#B71C1C', fontSize: '20px', marginTop: '24px', marginBottom: '12px', fontWeight: 'bold'}}>4. Viewing Reports (My Reports)</h2>
-        <p>Navigate to the <strong>My Reports</strong> tab to analyze data.</p>
+        <p>Navigate to the <strong>My Reports</strong> tab to analyze data. The system uses a "Latest Snapshot" logic for membership counts to ensure you always see the most current figures.</p>
 
         <h3 style={{fontSize: '18px', fontWeight: 'bold', marginTop: '16px', marginBottom: '8px'}}>Aggregated Summary</h3>
         <ul style={{marginLeft: '20px', listStyleType: 'disc'}}>
             <li>This table shows a roll-up of data for all units under your supervision.</li>
+            <li><strong>Membership Logic:</strong> The "Membership" column displays the sum of the <strong>LATEST</strong> reported count from each chapter within your scope.</li>
             <li><strong>Scope Rows:</strong> You will see a specific row for your own office's events (e.g., "Area Events" or "District Events") combined with the totals from your subordinate units.</li>
             <li><strong>Totals:</strong> A highlighted <strong>TOTAL</strong> row at the bottom sums up all columns.</li>
+        </ul>
+
+        <h3 style={{fontSize: '18px', fontWeight: 'bold', marginTop: '16px', marginBottom: '8px'}}>Summary Events Matrix</h3>
+        <ul style={{marginLeft: '20px', listStyleType: 'disc'}}>
+            <li>View a heatmap of activity types (Seminars, Rallies, etc.) across your entire jurisdiction.</li>
+            <li>This view helps identify which event types are driving the most engagement and where activity is concentrated.</li>
         </ul>
 
         <h3 style={{fontSize: '18px', fontWeight: 'bold', marginTop: '16px', marginBottom: '8px'}}>Filtering Data</h3>

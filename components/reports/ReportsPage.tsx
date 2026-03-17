@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import ReportTable from './ReportTable';
-import { ChapterMonthlyReport, Role, EventReport, Region, District, Zone, Area, Chapter } from '../../types';
+import SummaryEventsMatrix from './SummaryEventsMatrix';
+import EventReportList from './EventReportList';
+import EventReportForm from '../forms/EventReportForm';
+import { Role, EventReport, Region, District, Zone, Area, Chapter } from '../../types';
 import { AuthContext } from '../../context/AuthContext';
 import { DataContext } from '../../context/DataContext';
 import { apiService } from '../../services/apiService';
@@ -10,10 +13,13 @@ import Icon from '../ui/Icon';
 
 const ReportsPage: React.FC = () => {
   const { user } = useContext(AuthContext);
-  const { dataVersion } = useContext(DataContext);
-  const [reports, setReports] = useState<ChapterMonthlyReport[]>([]);
+  const { dataVersion, refreshData } = useContext(DataContext);
+  const [reports, setReports] = useState<any[]>([]);
   const [eventReports, setEventReports] = useState<EventReport[]>([]);
+  const [myEventReports, setMyEventReports] = useState<EventReport[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeView, setActiveView] = useState<'detailed' | 'matrix' | 'my-submissions'>('detailed');
+  const [editingReport, setEditingReport] = useState<EventReport | null>(null);
   
   const [orgRegistry, setOrgRegistry] = useState<{
     regions: Region[], districts: District[], zones: Zone[], areas: Area[], chapters: Chapter[]
@@ -88,13 +94,15 @@ const ReportsPage: React.FC = () => {
       if (user) {
         setLoading(true);
         try {
-            const [chapterReportsData, eventReportsData] = await Promise.all([
+            const [chapterReportsData, eventReportsData, myReportsData] = await Promise.all([
                 apiService.getChapterReports(filters, user),
-                apiService.getEventReports(filters, user)
+                apiService.getEventReports(filters, user),
+                apiService.getEventReports({ ...filters, reportingOfficerId: user.id }, user)
             ]);
             if (mounted) {
                 setReports(chapterReportsData);
                 setEventReports(eventReportsData);
+                setMyEventReports(myReportsData);
                 setLoading(false);
             }
         } catch (err) {
@@ -237,7 +245,6 @@ const ReportsPage: React.FC = () => {
     nextLevelUnits.sort((a, b) => collator.compare(getUnitSortKey(a, groupBy), getUnitSortKey(b, groupBy)));
     
     const sumData = (acc: any, curr: any) => ({
-        membershipCount: (acc.membershipCount || 0) + (curr.membershipCount || 0),
         attendance: (acc.attendance || 0) + (curr.attendance || 0),
         firstTimers: (acc.firstTimers || 0) + (curr.firstTimers || 0),
         salvations: (acc.salvations || 0) + (curr.salvations || 0),
@@ -245,16 +252,38 @@ const ReportsPage: React.FC = () => {
         membershipIntention: (acc.membershipIntention || 0) + (curr.membershipIntention || 0),
         offering: (acc.offering || 0) + (curr.offering || 0),
     });
-    const identity = { membershipCount: 0, attendance: 0, firstTimers: 0, salvations: 0, holyGhostBaptism: 0, membershipIntention: 0, offering: 0 };
+    const identity = { attendance: 0, firstTimers: 0, salvations: 0, holyGhostBaptism: 0, membershipIntention: 0, offering: 0 };
+
+    const getLatestMembership = (unitEvents: EventReport[], chapterIds: string[]) => {
+        const latest: { [cid: string]: { date: number, count: number } } = {};
+        
+        unitEvents.forEach(r => {
+            const cid = r.unitId.trim().toUpperCase();
+            if (chapterIds.includes(cid) && r.membershipCount && r.membershipCount > 0) {
+                const date = new Date(r.dateOfEvent).getTime();
+                if (!latest[cid] || date > latest[cid].date) {
+                    latest[cid] = { date, count: r.membershipCount };
+                }
+            }
+        });
+
+        return Object.values(latest).reduce((sum, item) => sum + item.count, 0);
+    };
 
     const rows: any[] = [];
     const normalizedScopeUnitId = currentScopeUnitId?.trim().toUpperCase();
 
     if (normalizedScopeUnitId && currentScopeRole) {
          const scopeEvents = eventReports.filter(r => r.unitId.trim().toUpperCase() === normalizedScopeUnitId);
-         const cpReports = ((currentScopeRole as Role) === Role.CHAPTER_PRESIDENT) ? reports.filter(r => r.chapterId.trim().toUpperCase() === normalizedScopeUnitId) : [];
-         if (scopeEvents.length > 0 || cpReports.length > 0 || (nextLevelUnits.length > 0 && (currentScopeRole as Role) !== Role.CHAPTER_PRESIDENT)) {
-            rows.push({ id: `scope-${normalizedScopeUnitId}`, name: currentScopeName, ...sumData(scopeEvents.reduce(sumData, identity), cpReports.reduce(sumData, identity)) });
+         
+         if (scopeEvents.length > 0 || (nextLevelUnits.length > 0 && (currentScopeRole as Role) !== Role.CHAPTER_PRESIDENT)) {
+            const membershipCount = getLatestMembership(scopeEvents, [normalizedScopeUnitId]);
+            rows.push({ 
+                id: `scope-${normalizedScopeUnitId}`, 
+                name: currentScopeName, 
+                membershipCount,
+                ...scopeEvents.reduce(sumData, identity)
+            });
          }
     }
 
@@ -278,15 +307,33 @@ const ReportsPage: React.FC = () => {
             localFind(unit.id);
         }
         
-        const unitReports = reports.filter(r => descendantChapterIds.includes(r.chapterId.trim().toUpperCase()));
         const unitEvents = eventReports.filter(r => descendantUnitIds.includes(r.unitId.trim().toUpperCase())); 
         
-        const unitSum = sumData(unitReports.reduce(sumData, identity), unitEvents.reduce(sumData, identity));
-        rows.push({ id: unit.id, name: unit.name, ...unitSum });
+        const membershipCount = getLatestMembership(unitEvents, descendantChapterIds);
+        const unitSum = unitEvents.reduce(sumData, identity);
+        rows.push({ id: unit.id, name: unit.name, membershipCount, ...unitSum });
     });
 
     if (rows.length > 0) {
-        rows.push({ id: 'total-row', name: 'GRAND TOTAL SUMMARY', ...rows.reduce(sumData, identity), isTotal: true });
+        // For the GRAND TOTAL row, we need to sum the latest membership across ALL chapters in the current scope
+        const allChapterIdsInScope: string[] = [];
+        if (groupBy === 'chapter') {
+            nextLevelUnits.forEach(u => allChapterIdsInScope.push(u.id.trim().toUpperCase()));
+        } else {
+            // This is a bit complex, but we can just sum the membershipCount of the rows we just created
+            // since each row represents a disjoint set of chapters (except for the "Office Events" row)
+        }
+        
+        const totalMembership = rows.reduce((sum, row) => sum + (row.membershipCount || 0), 0);
+        const totalOther = rows.reduce(sumData, identity);
+
+        rows.push({ 
+            id: 'total-row', 
+            name: 'GRAND TOTAL SUMMARY', 
+            membershipCount: totalMembership,
+            ...totalOther, 
+            isTotal: true 
+        });
     }
     return rows; 
   }, [reports, eventReports, filters, user, orgRegistry]);
@@ -304,6 +351,21 @@ const ReportsPage: React.FC = () => {
     return { unit: finalUnit, title: `FGBMFI Nigeria LOF - ${finalUnit}`, subTitle: `${targetOffice} | ${finalUnit}` };
   }, [filters, user, orgRegistry]);
 
+  const handleEditReport = (report: EventReport) => {
+    setEditingReport(report);
+  };
+
+  const handleEditComplete = () => {
+    setEditingReport(null);
+    // Refresh data explicitly
+    refreshData();
+    setFilters({ ...filters }); 
+  };
+
+  const handleEditCancel = () => {
+    setEditingReport(null);
+  };
+
   return (
     <div className="printable-area">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-8 gap-4 print:hidden">
@@ -319,17 +381,83 @@ const ReportsPage: React.FC = () => {
         )}
       </div>
       
-      <div className="flex justify-end space-x-2 mb-6 print:hidden">
-          <button onClick={() => exportService.toPDF(reportMetadata.title, reportMetadata.subTitle, filters.startDate ? `Period: ${filters.startDate} to ${filters.endDate}` : "Period: All Recorded History", breakdownData.length > 0 && !filters.chapterId, breakdownData.length > 0 && !filters.chapterId ? breakdownData : reports)} className="bg-fgbmfi-red text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-800 flex items-center shadow-sm active:scale-95"><Icon name="archive-box" className="w-4 h-4 mr-2"/>Export PDF</button>
-          <button onClick={() => exportService.toCSV(reportMetadata.title, reportMetadata.subTitle, filters.startDate ? `Period: ${filters.startDate} to ${filters.endDate}` : "Period: All Recorded History", breakdownData.length > 0 && !filters.chapterId, breakdownData.length > 0 && !filters.chapterId ? breakdownData : reports)} className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 flex items-center shadow-sm active:scale-95"><Icon name="report" className="w-4 h-4 mr-2"/>Export Excel</button>
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 print:hidden">
+        <div className="flex bg-gray-100 p-1 rounded-2xl">
+          <button 
+            onClick={() => setActiveView('detailed')}
+            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'detailed' ? 'bg-white text-fgbmfi-blue shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+          >
+            Detailed Reports
+          </button>
+          <button 
+            onClick={() => setActiveView('matrix')}
+            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'matrix' ? 'bg-white text-fgbmfi-blue shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+          >
+            Events Matrix
+          </button>
+          <button 
+            onClick={() => setActiveView('my-submissions')}
+            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'my-submissions' ? 'bg-white text-fgbmfi-blue shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+          >
+            My Submissions
+          </button>
+        </div>
+        <div className="flex space-x-2">
+            {activeView === 'detailed' && (
+              <>
+                <button onClick={() => exportService.toPDF(reportMetadata.title, reportMetadata.subTitle, filters.startDate ? `Period: ${filters.startDate} to ${filters.endDate}` : "Period: All Recorded History", breakdownData.length > 0 && !filters.chapterId, breakdownData.length > 0 && !filters.chapterId ? breakdownData : reports)} className="bg-fgbmfi-red text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-800 flex items-center shadow-sm active:scale-95"><Icon name="archive-box" className="w-4 h-4 mr-2"/>Export PDF</button>
+                <button onClick={() => exportService.toCSV(reportMetadata.title, reportMetadata.subTitle, filters.startDate ? `Period: ${filters.startDate} to ${filters.endDate}` : "Period: All Recorded History", breakdownData.length > 0 && !filters.chapterId, breakdownData.length > 0 && !filters.chapterId ? breakdownData : reports)} className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 flex items-center shadow-sm active:scale-95"><Icon name="report" className="w-4 h-4 mr-2"/>Export Excel</button>
+              </>
+            )}
+            {activeView === 'my-submissions' && (
+              <>
+                <button onClick={() => exportService.toPDF("My Submitted Reports", `User: ${user?.name}`, filters.startDate ? `Period: ${filters.startDate} to ${filters.endDate}` : "Period: All History", false, myEventReports)} className="bg-fgbmfi-red text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-800 flex items-center shadow-sm active:scale-95"><Icon name="archive-box" className="w-4 h-4 mr-2"/>Export PDF</button>
+                <button onClick={() => exportService.toCSV("My Submitted Reports", `User: ${user?.name}`, filters.startDate ? `Period: ${filters.startDate} to ${filters.endDate}` : "Period: All History", false, myEventReports)} className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 flex items-center shadow-sm active:scale-95"><Icon name="report" className="w-4 h-4 mr-2"/>Export Excel</button>
+              </>
+            )}
+        </div>
       </div>
+
       <ReportFiltersSection filters={filters} handleFilterChange={handleFilterChange} handleDateChange={handleDateChange} />
-      {loading ? ( <div className="p-20 text-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-fgbmfi-blue mx-auto mb-4"></div><p className="text-xs font-black uppercase text-gray-400">Syncing Cloud Reports...</p></div> ) : (
-        <>
-            {breakdownData.length > 0 && !filters.chapterId && ( <div className="mb-6 mt-6"><h2 className="text-lg font-black text-fgbmfi-blue mb-4 uppercase tracking-tight">{reportMetadata.unit} - Summary Breakdown</h2><ReportTable data={breakdownData} isAggregated={true} /></div> )}
-            {((filters.chapterId && reports.length > 0) || (user?.role === Role.CHAPTER_PRESIDENT && reports.length > 0)) && ( <div className="mt-8"><h2 className="text-lg font-black text-fgbmfi-blue mb-4 uppercase tracking-tight">Monthly Activity History</h2><ReportTable data={reports} /></div> )}
-            {breakdownData.length === 0 && reports.length === 0 && ( <div className="bg-white p-20 rounded-[2rem] shadow-sm border border-gray-100 text-center"><Icon name="archive-box" className="w-12 h-12 text-gray-200 mx-auto mb-4" /><p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">No reporting records found for this unit.</p></div> )}
-        </>
+      
+      {loading ? ( 
+        <div className="p-20 text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-fgbmfi-blue mx-auto mb-4"></div>
+          <p className="text-xs font-black uppercase text-gray-400">Syncing Cloud Reports...</p>
+        </div> 
+      ) : editingReport ? (
+        <div className="mt-6 max-w-4xl mx-auto">
+          <EventReportForm 
+            key={editingReport.id}
+            initialData={editingReport} 
+            onComplete={handleEditComplete} 
+            onCancel={handleEditCancel} 
+          />
+        </div>
+      ) : (
+        <div className="mt-6">
+          {activeView === 'matrix' ? (
+            <SummaryEventsMatrix filters={filters} user={user!} unitName={reportMetadata.unit} />
+          ) : activeView === 'my-submissions' ? (
+            <div className="max-w-5xl mx-auto">
+                <div className="mb-6">
+                    <h2 className="text-lg font-black text-fgbmfi-blue mb-2 uppercase tracking-tight">My Recent Submissions</h2>
+                    <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-6">You can edit reports you submitted for your office or chapter.</p>
+                </div>
+                <EventReportList 
+                    reports={myEventReports} 
+                    onEdit={handleEditReport} 
+                    user={user!} 
+                />
+            </div>
+          ) : (
+            <>
+                {breakdownData.length > 0 && !filters.chapterId && ( <div className="mb-6"><h2 className="text-lg font-black text-fgbmfi-blue mb-4 uppercase tracking-tight">{reportMetadata.unit} - Summary Breakdown</h2><ReportTable data={breakdownData} isAggregated={true} /></div> )}
+                {((filters.chapterId && reports.length > 0) || (user?.role === Role.CHAPTER_PRESIDENT && reports.length > 0)) && ( <div className="mt-8"><h2 className="text-lg font-black text-fgbmfi-blue mb-4 uppercase tracking-tight">Monthly Activity History</h2><ReportTable data={reports} /></div> )}
+                {breakdownData.length === 0 && reports.length === 0 && ( <div className="bg-white p-20 rounded-[2rem] shadow-sm border border-gray-100 text-center"><Icon name="archive-box" className="w-12 h-12 text-gray-200 mx-auto mb-4" /><p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">No reporting records found for this unit.</p></div> )}
+            </>
+          )}
+        </div>
       )}
     </div>
   );

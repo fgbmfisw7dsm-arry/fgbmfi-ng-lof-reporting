@@ -1,7 +1,6 @@
 import React, { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../../context/AuthContext';
 import { Role } from '../../types';
-import ChapterReportForm from './ChapterReportForm';
 import EventReportForm from './EventReportForm';
 import { apiService } from '../../services/apiService';
 
@@ -45,9 +44,9 @@ const FormsPage: React.FC = () => {
   if (!user) return null;
 
   const isChapterPresident = user.role === Role.CHAPTER_PRESIDENT;
-  const formTitle = isChapterPresident ? 'Chapter President Monthly Input Form' : `${user.role} Event Data Form`;
+  const formTitle = isChapterPresident ? 'Chapter Event Data Entry Form' : `${user.role} Event Data Form`;
   const formDescription = isChapterPresident 
-    ? "As a Chapter President, please fill out your chapter's monthly performance report below."
+    ? "As a Chapter President, please fill out your chapter's event performance report below."
     : `As a ${user.role}, please use this form to submit data for your periodic events.`;
 
   return (
@@ -65,11 +64,7 @@ const FormsPage: React.FC = () => {
         )}
       </div>
       <div className="max-w-4xl mx-auto">
-        {isChapterPresident ? (
-          <ChapterReportForm />
-        ) : (
-          <EventReportForm />
-        )}
+        <EventReportForm />
       </div>
     </div>
   );

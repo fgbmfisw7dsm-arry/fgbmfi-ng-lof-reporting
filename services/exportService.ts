@@ -27,11 +27,11 @@ export const exportService = {
     doc.setTextColor(150);
     doc.setFont("helvetica", "normal");
     doc.text(dateRangeStr, 14, 37);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 42);
+    doc.text(`Generated on: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}`, 14, 42);
 
     const head = isAggregated 
         ? [['Name', 'Membership', 'Attendance', 'First Timers', 'Salvations', 'H.G. Baptism', 'Intentions', 'Offering']]
-        : [['Month', 'Year', 'Membership', 'Attendance', 'First Timers', 'Salvations', 'H.G. Baptism', 'Intentions', 'Offering']];
+        : [['Date/Period', 'Membership', 'Attendance', 'First Timers', 'Salvations', 'H.G. Baptism', 'Intentions', 'Offering']];
 
     const body = data.map((row: any) => {
         if (isAggregated) {
@@ -46,9 +46,11 @@ export const exportService = {
                 row.offering?.toLocaleString() || 0
             ];
         } else {
+             const dateStr = row.isEvent 
+                ? new Date(row.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                : `${row.month} ${row.year}`;
              return [
-                row.month,
-                row.year,
+                dateStr,
                 row.membershipCount?.toLocaleString() || 0,
                 row.attendance?.toLocaleString() || 0,
                 row.firstTimers?.toLocaleString() || 0,
@@ -88,23 +90,32 @@ export const exportService = {
     }
     const headers = isAggregated 
         ? ['Name', 'Membership', 'Attendance', 'First Timers', 'Salvations', 'H.G. Baptism', 'Membership Intentions', 'Offering']
-        : ['Month', 'Year', 'Membership', 'Attendance', 'First Timers', 'Salvations', 'H.G. Baptism', 'Membership Intentions', 'Offering'];
+        : ['Date/Period', 'Membership', 'Attendance', 'First Timers', 'Salvations', 'H.G. Baptism', 'Membership Intentions', 'Offering'];
         
-    const keys = isAggregated
-        ? ['name', 'membershipCount', 'attendance', 'firstTimers', 'salvations', 'holyGhostBaptism', 'membershipIntention', 'offering']
-        : ['month', 'year', 'membershipCount', 'attendance', 'firstTimers', 'salvations', 'holyGhostBaptism', 'membershipIntention', 'offering'];
-    
     // Add metadata rows at the top for context
     const csvRows = [
         `"REPORT: ${title.replace(/"/g, '""')}"`,
         `"OFFICE/UNIT: ${subTitle.replace(/"/g, '""')}"`,
         `"PERIOD: ${dateRange.replace(/"/g, '""')}"`,
-        `"GENERATED: ${new Date().toLocaleString().replace(/"/g, '""')}"`,
+        `"GENERATED: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/"/g, '""')}"`,
         '', // Empty spacer
         headers.join(','),
-        ...data.map(row => 
-            keys.map(key => `"${String((row as any)[key] || 0).replace(/"/g, '""')}"`).join(',')
-        )
+        ...data.map(row => {
+            const dateStr = isAggregated ? (row.name || 'Summary') : (row.isEvent 
+                ? new Date(row.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                : `${row.month} ${row.year}`);
+            
+            return [
+                `"${dateStr.replace(/"/g, '""')}"`,
+                `"${String(row.membershipCount || 0).replace(/"/g, '""')}"`,
+                `"${String(row.attendance || 0).replace(/"/g, '""')}"`,
+                `"${String(row.firstTimers || 0).replace(/"/g, '""')}"`,
+                `"${String(row.salvations || 0).replace(/"/g, '""')}"`,
+                `"${String(row.holyGhostBaptism || 0).replace(/"/g, '""')}"`,
+                `"${String(row.membershipIntention || 0).replace(/"/g, '""')}"`,
+                `"${String(row.offering || 0).replace(/"/g, '""')}"`
+            ].join(',');
+        })
     ];
     
     const csvContent = csvRows.join('\n');

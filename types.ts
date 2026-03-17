@@ -58,20 +58,6 @@ export interface EventType {
   name: string;
 }
 
-export interface ChapterMonthlyReport {
-  id: string;
-  chapterId: string;
-  month: string;
-  year: number;
-  membershipCount: number;
-  attendance: number;
-  firstTimers: number;
-  salvations: number;
-  holyGhostBaptism: number;
-  membershipIntention: number;
-  offering: number;
-}
-
 export interface EventReport {
   id: string;
   reportingOfficerId: string;
@@ -85,6 +71,8 @@ export interface EventReport {
   holyGhostBaptism: number;
   offering: number;
   membershipIntention: number;
+  membershipCount?: number; // Added for Chapter reports
+  isLegacy?: boolean;
 }
 
 export interface DashboardStats {

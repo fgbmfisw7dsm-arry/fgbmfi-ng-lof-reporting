@@ -1,7 +1,7 @@
 
 import React from 'react';
 
-type IconName = 'home' | 'dashboard' | 'form' | 'report' | 'admin' | 'logout' | 'user' | 'arrow-down' | 'chart-bar' | 'chart-pie' | 'users' | 'cash' | 'trending-up' | 'plus' | 'edit' | 'trash' | 'menu' | 'close' | 'building-office' | 'archive-box' | 'eye' | 'eye-slash' | 'book-open' | 'clipboard';
+type IconName = 'home' | 'dashboard' | 'form' | 'report' | 'admin' | 'logout' | 'user' | 'arrow-down' | 'chart-bar' | 'chart-pie' | 'users' | 'cash' | 'trending-up' | 'plus' | 'edit' | 'trash' | 'menu' | 'close' | 'building-office' | 'archive-box' | 'eye' | 'eye-slash' | 'book-open' | 'clipboard' | 'file-excel' | 'file-pdf';
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
   name: IconName;
@@ -9,6 +9,13 @@ interface IconProps extends React.SVGProps<SVGSVGElement> {
 }
 
 const ICONS: Record<IconName, React.FC<React.SVGProps<SVGSVGElement>>> = {
+    // ... (existing icons)
+    'file-excel': (props) => (
+        <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+    ),
+    'file-pdf': (props) => (
+        <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9h1m-1 4h1m-1 4h1m4-4h1m-1 4h1" /></svg>
+    ),
     home: (props) => (
         <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
     ),
