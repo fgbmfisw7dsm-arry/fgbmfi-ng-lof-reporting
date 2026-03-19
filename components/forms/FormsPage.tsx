@@ -3,6 +3,7 @@ import { AuthContext } from '../../context/AuthContext';
 import { Role } from '../../types';
 import EventReportForm from './EventReportForm';
 import { apiService } from '../../services/apiService';
+import Icon from '../ui/Icon';
 
 const FormsPage: React.FC = () => {
   const { user } = useContext(AuthContext);
@@ -44,6 +45,26 @@ const FormsPage: React.FC = () => {
   if (!user) return null;
 
   const isChapterPresident = user.role === Role.CHAPTER_PRESIDENT;
+  const isViewOnly = [Role.DISTRICT_BOARD_MEMBER, Role.REGIONAL_EXECUTIVE_COUNCIL, Role.NATIONAL_EXECUTIVE_COUNCIL].includes(user.role);
+
+  if (isViewOnly) {
+    return (
+      <div className="bg-white p-12 rounded-[2rem] shadow-xl border border-gray-100 text-center max-w-2xl mx-auto mt-10">
+        <div className="w-20 h-20 bg-fgbmfi-blue/5 rounded-full flex items-center justify-center mx-auto mb-6">
+          <Icon name="archive-box" className="w-10 h-10 text-fgbmfi-blue" />
+        </div>
+        <h1 className="text-3xl font-black text-gray-900 tracking-tight mb-4">View-Only Access</h1>
+        <p className="text-gray-500 font-medium leading-relaxed">
+          As a <span className="text-fgbmfi-blue font-black">{user.role}</span>, your account is configured for observation and reporting oversight. 
+          You do not have permission to submit or edit event data.
+        </p>
+        <div className="mt-8 pt-8 border-t border-gray-50">
+           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Please visit the Dashboard or Reports portal to view performance data.</p>
+        </div>
+      </div>
+    );
+  }
+
   const formTitle = isChapterPresident ? 'Chapter Event Data Entry Form' : `${user.role} Event Data Form`;
   const formDescription = isChapterPresident 
     ? "As a Chapter President, please fill out your chapter's event performance report below."

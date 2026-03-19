@@ -96,10 +96,10 @@ const EventReportForm: React.FC<EventReportFormProps> = ({ initialData, onComple
     if (!user) return;
 
     // SECURITY CHECK: Prevent archived users from submitting
-    if (user.role === Role.FORMER_OFFICER || user.email.toLowerCase().endsWith('@archived.lof')) {
-        setMessage("ACCESS REVOKED: Your officer profile has been archived. You can no longer submit reports.");
-        // Trigger a logout after a short delay
-        setTimeout(() => window.location.reload(), 3000);
+    const isViewOnly = [Role.DISTRICT_BOARD_MEMBER, Role.REGIONAL_EXECUTIVE_COUNCIL, Role.NATIONAL_EXECUTIVE_COUNCIL].includes(user.role);
+    if (user.role === Role.FORMER_OFFICER || user.email.toLowerCase().endsWith('@archived.lof') || isViewOnly) {
+        setMessage(isViewOnly ? "READ-ONLY: Your account does not have permission to submit reports." : "ACCESS REVOKED: Your officer profile has been archived. You can no longer submit reports.");
+        if (!isViewOnly) setTimeout(() => window.location.reload(), 3000);
         return;
     }
 

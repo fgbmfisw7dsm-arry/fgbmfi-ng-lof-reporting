@@ -145,9 +145,12 @@ export const UserFormModal: React.FC<{
             case Role.FIELD_REPRESENTATIVE: units = orgData.areas; break;
             case Role.NATIONAL_DIRECTOR: units = orgData.zones; break;
             case Role.DISTRICT_COORDINATOR:
-            case Role.DISTRICT_ADMIN: units = orgData.districts; break;
+            case Role.DISTRICT_ADMIN:
+            case Role.DISTRICT_BOARD_MEMBER: units = orgData.districts; break;
             case Role.REGIONAL_VICE_PRESIDENT:
-            case Role.REGIONAL_ADMIN: units = orgData.regions; break;
+            case Role.REGIONAL_ADMIN:
+            case Role.REGIONAL_EXECUTIVE_COUNCIL: units = orgData.regions; break;
+            case Role.NATIONAL_EXECUTIVE_COUNCIL: return [{ id: 'national', name: 'National HQ' }];
             default: return [{ id: 'national', name: 'National HQ' }];
         }
         return sortByName(units);

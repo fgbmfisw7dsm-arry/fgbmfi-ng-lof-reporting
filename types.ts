@@ -9,6 +9,9 @@ export enum Role {
   NATIONAL_DIRECTOR = 'National Director (ND)',
   FIELD_REPRESENTATIVE = 'Field Representative (FR)',
   CHAPTER_PRESIDENT = 'Chapter President (CP)',
+  DISTRICT_BOARD_MEMBER = 'District Board Member (DBM)',
+  REGIONAL_EXECUTIVE_COUNCIL = 'Regional Executive Council (REC)',
+  NATIONAL_EXECUTIVE_COUNCIL = 'National Executive Council (NEC)',
   FORMER_OFFICER = 'Former Officer',
 }
 

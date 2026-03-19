@@ -351,9 +351,9 @@ export const apiService = {
 
     const breakdown: any[] = [];
     const getOfficeLabel = (r: Role) => {
-        if (r === Role.NATIONAL_PRESIDENT || r === Role.NATIONAL_ADMIN) return "National HQ Events";
-        if (r === Role.REGIONAL_VICE_PRESIDENT || r === Role.REGIONAL_ADMIN) return "Regional HQ Events";
-        if (r === Role.DISTRICT_COORDINATOR || r === Role.DISTRICT_ADMIN) return "District HQ Events";
+        if (r === Role.NATIONAL_PRESIDENT || r === Role.NATIONAL_ADMIN || r === Role.NATIONAL_EXECUTIVE_COUNCIL) return "National HQ Events";
+        if (r === Role.REGIONAL_VICE_PRESIDENT || r === Role.REGIONAL_ADMIN || r === Role.REGIONAL_EXECUTIVE_COUNCIL) return "Regional HQ Events";
+        if (r === Role.DISTRICT_COORDINATOR || r === Role.DISTRICT_ADMIN || r === Role.DISTRICT_BOARD_MEMBER) return "District HQ Events";
         if (r === Role.NATIONAL_DIRECTOR) return "Zonal HQ Events";
         if (r === Role.FIELD_REPRESENTATIVE) return "Area HQ Events";
         return "Office Events";
@@ -384,9 +384,9 @@ export const apiService = {
 
     const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
     const subUnitsBreakdown: any[] = [];
-    if (normalizedUnitId === 'NATIONAL') { regs.forEach(r => subUnitsBreakdown.push({ name: r.name, value: getUnitTotals(r.id), unitId: r.id, role: Role.REGIONAL_VICE_PRESIDENT })); }
-    else if (role === Role.REGIONAL_VICE_PRESIDENT || role === Role.REGIONAL_ADMIN) { dists.filter(d => d.regionId.trim().toUpperCase() === normalizedUnitId).forEach(d => subUnitsBreakdown.push({ name: d.name, value: getUnitTotals(d.id), unitId: d.id, role: Role.DISTRICT_COORDINATOR })); }
-    else if (role === Role.DISTRICT_COORDINATOR || role === Role.DISTRICT_ADMIN) { zones.filter(z => z.districtId.trim().toUpperCase() === normalizedUnitId).forEach(z => subUnitsBreakdown.push({ name: z.name, value: getUnitTotals(z.id), unitId: z.id, role: Role.NATIONAL_DIRECTOR })); }
+    if (normalizedUnitId === 'NATIONAL' || role === Role.NATIONAL_EXECUTIVE_COUNCIL) { regs.forEach(r => subUnitsBreakdown.push({ name: r.name, value: getUnitTotals(r.id), unitId: r.id, role: Role.REGIONAL_VICE_PRESIDENT })); }
+    else if (role === Role.REGIONAL_VICE_PRESIDENT || role === Role.REGIONAL_ADMIN || role === Role.REGIONAL_EXECUTIVE_COUNCIL) { dists.filter(d => d.regionId.trim().toUpperCase() === normalizedUnitId).forEach(d => subUnitsBreakdown.push({ name: d.name, value: getUnitTotals(d.id), unitId: d.id, role: Role.DISTRICT_COORDINATOR })); }
+    else if (role === Role.DISTRICT_COORDINATOR || role === Role.DISTRICT_ADMIN || role === Role.DISTRICT_BOARD_MEMBER) { zones.filter(z => z.districtId.trim().toUpperCase() === normalizedUnitId).forEach(z => subUnitsBreakdown.push({ name: z.name, value: getUnitTotals(z.id), unitId: z.id, role: Role.NATIONAL_DIRECTOR })); }
     else if (role === Role.NATIONAL_DIRECTOR) { areas.filter(a => a.zoneId.trim().toUpperCase() === normalizedUnitId).forEach(a => subUnitsBreakdown.push({ name: a.name, value: getUnitTotals(a.id), unitId: a.id, role: Role.FIELD_REPRESENTATIVE })); }
     else if (role === Role.FIELD_REPRESENTATIVE) { chaps.filter(c => c.areaId.trim().toUpperCase() === normalizedUnitId).forEach(c => subUnitsBreakdown.push({ name: c.name, value: getUnitTotals(c.id), unitId: c.id, role: Role.CHAPTER_PRESIDENT })); }
 

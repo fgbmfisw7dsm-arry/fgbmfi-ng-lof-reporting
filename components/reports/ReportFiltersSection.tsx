@@ -22,8 +22,8 @@ export const ReportFiltersSection: React.FC<FilterProps> = ({ filters, handleFil
   // Strict boolean casting for Vercel/TS compiler compatibility
   const isNational = user?.unitId ? user.unitId.trim().toUpperCase() === 'NATIONAL' : false;
   
-  const lockRegion = user ? [Role.REGIONAL_VICE_PRESIDENT, Role.REGIONAL_ADMIN, Role.DISTRICT_COORDINATOR, Role.DISTRICT_ADMIN, Role.NATIONAL_DIRECTOR, Role.FIELD_REPRESENTATIVE, Role.CHAPTER_PRESIDENT].includes(user.role) : false;
-  const lockDistrict = user ? [Role.DISTRICT_COORDINATOR, Role.DISTRICT_ADMIN, Role.NATIONAL_DIRECTOR, Role.FIELD_REPRESENTATIVE, Role.CHAPTER_PRESIDENT].includes(user.role) : false;
+  const lockRegion = user ? [Role.REGIONAL_VICE_PRESIDENT, Role.REGIONAL_ADMIN, Role.REGIONAL_EXECUTIVE_COUNCIL, Role.DISTRICT_COORDINATOR, Role.DISTRICT_ADMIN, Role.DISTRICT_BOARD_MEMBER, Role.NATIONAL_DIRECTOR, Role.FIELD_REPRESENTATIVE, Role.CHAPTER_PRESIDENT].includes(user.role) : false;
+  const lockDistrict = user ? [Role.DISTRICT_COORDINATOR, Role.DISTRICT_ADMIN, Role.DISTRICT_BOARD_MEMBER, Role.NATIONAL_DIRECTOR, Role.FIELD_REPRESENTATIVE, Role.CHAPTER_PRESIDENT].includes(user.role) : false;
   const lockZone = user ? [Role.NATIONAL_DIRECTOR, Role.FIELD_REPRESENTATIVE, Role.CHAPTER_PRESIDENT].includes(user.role) : false;
   const lockArea = user ? [Role.FIELD_REPRESENTATIVE, Role.CHAPTER_PRESIDENT].includes(user.role) : false;
   const lockChapter = user ? [Role.CHAPTER_PRESIDENT].includes(user.role) : false;

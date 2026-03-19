@@ -184,6 +184,7 @@ const ReportsPage: React.FC = () => {
                  break;
             case Role.DISTRICT_COORDINATOR:
             case Role.DISTRICT_ADMIN:
+            case Role.DISTRICT_BOARD_MEMBER:
                  groupBy = 'zone';
                  nextLevelUnits = orgRegistry.zones.filter(z => z.districtId === user.unitId);
                  currentScopeUnitId = user.unitId;
@@ -192,6 +193,7 @@ const ReportsPage: React.FC = () => {
                  break;
             case Role.REGIONAL_VICE_PRESIDENT:
             case Role.REGIONAL_ADMIN:
+            case Role.REGIONAL_EXECUTIVE_COUNCIL:
                  groupBy = 'district';
                  nextLevelUnits = orgRegistry.districts.filter(d => d.regionId === user.unitId);
                  currentScopeUnitId = user.unitId;
@@ -204,6 +206,7 @@ const ReportsPage: React.FC = () => {
                  currentScopeRole = Role.CHAPTER_PRESIDENT;
                  currentScopeName = "Chapter Events";
                  break;
+            case Role.NATIONAL_EXECUTIVE_COUNCIL:
             default:
                  groupBy = 'region';
                  nextLevelUnits = orgRegistry.regions;
