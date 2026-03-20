@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { apiService } from '../../services/apiService';
 import { DataContext } from '../../context/DataContext';
-import { EventReport, EventType, User, Role } from '../../types';
+import { EventReport, EventType, User, Role, Region, District, Zone, Area, Chapter } from '../../types';
 import Icon from '../ui/Icon';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -17,8 +17,10 @@ const SummaryEventsMatrix: React.FC<SummaryEventsMatrixProps> = ({ filters, user
   const { dataVersion } = useContext(DataContext);
   const [reports, setReports] = useState<EventReport[]>([]);
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
+  const [orgRegistry, setOrgRegistry] = useState<{
+    regions: Region[], districts: District[], zones: Zone[], areas: Area[], chapters: Chapter[]
+  }>({ regions: [], districts: [], zones: [], areas: [], chapters: [] });
   const [loading, setLoading] = useState(true);
-  const [units, setUnits] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -36,9 +38,7 @@ const SummaryEventsMatrix: React.FC<SummaryEventsMatrixProps> = ({ filters, user
         
         setReports(eventData);
         setEventTypes(types);
-        
-        // Combine all units for lookup
-        setUnits([...regs, ...dists, ...zones, ...areas, ...chaps]);
+        setOrgRegistry({ regions: regs, districts: dists, zones: zones, areas: areas, chapters: chaps });
       } catch (err) {
         console.error("Failed to fetch matrix data", err);
       } finally {
@@ -49,41 +49,188 @@ const SummaryEventsMatrix: React.FC<SummaryEventsMatrixProps> = ({ filters, user
   }, [filters, user, dataVersion]);
 
   const matrixData = useMemo(() => {
+    let groupBy: 'chapter' | 'area' | 'zone' | 'district' | 'region' | 'none' = 'region';
+    let nextLevelUnits: {id: string, name: string}[] = [];
+    let currentScopeUnitId: string | null = null;
+    let currentScopeRole: Role | null = null;
+    let currentScopeName = "Office Events";
+
+    if (filters.areaId) {
+        groupBy = 'chapter';
+        nextLevelUnits = orgRegistry.chapters.filter(c => c.areaId === filters.areaId);
+        currentScopeUnitId = filters.areaId;
+        currentScopeRole = Role.FIELD_REPRESENTATIVE;
+        currentScopeName = "Area Events";
+    } else if (filters.zoneId) {
+        groupBy = 'area';
+        nextLevelUnits = orgRegistry.areas.filter(a => a.zoneId === filters.zoneId);
+        currentScopeUnitId = filters.zoneId;
+        currentScopeRole = Role.NATIONAL_DIRECTOR;
+        currentScopeName = "Zonal Events";
+    } else if (filters.districtId) {
+        groupBy = 'zone';
+        nextLevelUnits = orgRegistry.zones.filter(z => z.districtId === filters.districtId);
+        currentScopeUnitId = filters.districtId;
+        currentScopeRole = Role.DISTRICT_COORDINATOR;
+        currentScopeName = "District Events";
+    } else if (filters.regionId) {
+        groupBy = 'district';
+        nextLevelUnits = orgRegistry.districts.filter(d => d.regionId === filters.regionId);
+        currentScopeUnitId = filters.regionId;
+        currentScopeRole = Role.REGIONAL_VICE_PRESIDENT;
+        currentScopeName = "Regional Events";
+    } else if (user) {
+        switch (user.role) {
+            case Role.FIELD_REPRESENTATIVE:
+                 groupBy = 'chapter';
+                 nextLevelUnits = orgRegistry.chapters.filter(c => c.areaId === user.unitId);
+                 currentScopeUnitId = user.unitId;
+                 currentScopeRole = Role.FIELD_REPRESENTATIVE;
+                 currentScopeName = "Area Events";
+                 break;
+            case Role.NATIONAL_DIRECTOR:
+                 groupBy = 'area';
+                 nextLevelUnits = orgRegistry.areas.filter(a => a.zoneId === user.unitId);
+                 currentScopeUnitId = user.unitId;
+                 currentScopeRole = Role.NATIONAL_DIRECTOR;
+                 currentScopeName = "Zonal Events";
+                 break;
+            case Role.DISTRICT_COORDINATOR:
+            case Role.DISTRICT_ADMIN:
+            case Role.DISTRICT_BOARD_MEMBER:
+                 groupBy = 'zone';
+                 nextLevelUnits = orgRegistry.zones.filter(z => z.districtId === user.unitId);
+                 currentScopeUnitId = user.unitId;
+                 currentScopeRole = Role.DISTRICT_COORDINATOR;
+                 currentScopeName = "District Events";
+                 break;
+            case Role.REGIONAL_VICE_PRESIDENT:
+            case Role.REGIONAL_ADMIN:
+            case Role.REGIONAL_EXECUTIVE_COUNCIL:
+                 groupBy = 'district';
+                 nextLevelUnits = orgRegistry.districts.filter(d => d.regionId === user.unitId);
+                 currentScopeUnitId = user.unitId;
+                 currentScopeRole = Role.REGIONAL_VICE_PRESIDENT;
+                 currentScopeName = "Regional Events";
+                 break;
+            case Role.CHAPTER_PRESIDENT:
+                 groupBy = 'none' as any;
+                 currentScopeUnitId = user.unitId;
+                 currentScopeRole = Role.CHAPTER_PRESIDENT;
+                 currentScopeName = "Chapter Events";
+                 break;
+            case Role.NATIONAL_EXECUTIVE_COUNCIL:
+            default:
+                 groupBy = 'region';
+                 nextLevelUnits = orgRegistry.regions;
+                 currentScopeUnitId = 'national';
+                 currentScopeRole = Role.NATIONAL_PRESIDENT;
+                 currentScopeName = "National Events";
+                 break;
+        }
+    }
+
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+    
+    const getUnitSortKey = (unit: any, type: string) => {
+        if (type === 'region') return unit.name;
+        if (type === 'district') {
+            const reg = orgRegistry.regions.find(r => r.id === unit.regionId);
+            return `${reg?.name || ''} | ${unit.name}`;
+        }
+        if (type === 'zone') {
+            const dist = orgRegistry.districts.find(d => d.id === unit.districtId);
+            const reg = orgRegistry.regions.find(r => r.id === dist?.regionId);
+            return `${reg?.name || ''} | ${dist?.name || ''} | ${unit.name}`;
+        }
+        if (type === 'area') {
+            const zone = orgRegistry.zones.find(z => z.id === unit.zoneId);
+            const dist = orgRegistry.districts.find(d => d.id === zone?.districtId);
+            return `${dist?.name || ''} | ${zone?.name || ''} | ${unit.name}`;
+        }
+        if (type === 'chapter') {
+            const area = orgRegistry.areas.find(a => a.id === unit.areaId);
+            const zone = orgRegistry.zones.find(z => z.id === area?.zoneId);
+            return `${zone?.name || ''} | ${area?.name || ''} | ${unit.name}`;
+        }
+        return unit.name;
+    };
+    
+    nextLevelUnits.sort((a, b) => collator.compare(getUnitSortKey(a, groupBy), getUnitSortKey(b, groupBy)));
+
     const data: { [unitId: string]: { [eventType: string]: number } } = {};
     const unitNames: { [id: string]: string } = {};
     const columnTotals: { [eventType: string]: number } = {};
     let grandTotal = 0;
 
-    reports.forEach(report => {
-      const unitId = report.unitId.toUpperCase();
-      // Only count reports that match one of our known event types to avoid off-by-one errors with legacy data
-      const matchingType = eventTypes.find(t => t.name === report.eventType);
-      if (!matchingType) return;
+    const rows: string[] = [];
+    const normalizedScopeUnitId = currentScopeUnitId?.trim().toUpperCase();
 
-      if (!data[unitId]) data[unitId] = {};
-      if (!data[unitId][report.eventType]) data[unitId][report.eventType] = 0;
-      data[unitId][report.eventType]++;
+    if (normalizedScopeUnitId) {
+        const scopeId = `scope-${normalizedScopeUnitId}`;
+        rows.push(scopeId);
+        unitNames[scopeId] = currentScopeName;
+        data[scopeId] = {};
+    }
 
-      if (!columnTotals[report.eventType]) columnTotals[report.eventType] = 0;
-      columnTotals[report.eventType]++;
-      grandTotal++;
-
-      // Store unit name for display
-      if (!unitNames[unitId]) {
-        const unit = units.find(u => u.id.toUpperCase() === unitId);
-        unitNames[unitId] = unit ? unit.name : unitId;
-      }
+    nextLevelUnits.forEach(unit => {
+        const normId = unit.id.trim().toUpperCase();
+        rows.push(normId);
+        unitNames[normId] = unit.name;
+        data[normId] = {};
     });
 
-    return { data, unitNames, columnTotals, grandTotal };
-  }, [reports, units]);
+    reports.forEach(report => {
+        const reportUnitId = report.unitId.trim().toUpperCase();
+        let targetRowId = '';
+
+        if (reportUnitId === normalizedScopeUnitId) {
+            targetRowId = `scope-${normalizedScopeUnitId}`;
+        } else {
+            const findParentRow = (id: string): string | null => {
+                const normId = id.trim().toUpperCase();
+                if (rows.includes(normId) && normId !== `scope-${normalizedScopeUnitId}`) return normId;
+                
+                const chapter = orgRegistry.chapters.find(c => c.id.trim().toUpperCase() === normId);
+                if (chapter) return findParentRow(chapter.areaId);
+                
+                const area = orgRegistry.areas.find(a => a.id.trim().toUpperCase() === normId);
+                if (area) return findParentRow(area.zoneId);
+                
+                const zone = orgRegistry.zones.find(z => z.id.trim().toUpperCase() === normId);
+                if (zone) return findParentRow(zone.districtId);
+                
+                const district = orgRegistry.districts.find(d => d.id.trim().toUpperCase() === normId);
+                if (district) return findParentRow(district.regionId);
+                
+                return null;
+            };
+
+            targetRowId = findParentRow(reportUnitId) || '';
+        }
+
+        if (targetRowId && data[targetRowId]) {
+            const matchingType = eventTypes.find(t => t.name === report.eventType);
+            if (!matchingType) return;
+
+            if (!data[targetRowId][report.eventType]) data[targetRowId][report.eventType] = 0;
+            data[targetRowId][report.eventType]++;
+
+            if (!columnTotals[report.eventType]) columnTotals[report.eventType] = 0;
+            columnTotals[report.eventType]++;
+            grandTotal++;
+        }
+    });
+
+    return { data, unitNames, columnTotals, grandTotal, rows };
+  }, [reports, orgRegistry, eventTypes, filters, user]);
 
   const exportToExcel = () => {
     const worksheetData = [];
     const headers = ['Unit / Office', ...eventTypes.map(t => t.name), 'Total Events'];
     worksheetData.push(headers);
 
-    Object.keys(matrixData.data).forEach(unitId => {
+    matrixData.rows.forEach(unitId => {
       const row: string[] = [matrixData.unitNames[unitId] || unitId];
       let rowTotal = 0;
       eventTypes.forEach(type => {
@@ -117,7 +264,7 @@ const SummaryEventsMatrix: React.FC<SummaryEventsMatrixProps> = ({ filters, user
     doc.text(`Period: ${formatDate(filters.startDate)} to ${formatDate(filters.endDate)}`, 14, 36);
 
     const headers = [['Unit / Office', ...eventTypes.map(t => t.name), 'Total']];
-    const body = Object.keys(matrixData.data).map(unitId => {
+    const body = matrixData.rows.map(unitId => {
       let rowTotal = 0;
       const row: (string | number)[] = [matrixData.unitNames[unitId] || unitId];
       eventTypes.forEach(type => {
@@ -151,7 +298,7 @@ const SummaryEventsMatrix: React.FC<SummaryEventsMatrixProps> = ({ filters, user
     );
   }
 
-  const unitIds = Object.keys(matrixData.data);
+  const unitIds = matrixData.rows;
 
   return (
     <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">

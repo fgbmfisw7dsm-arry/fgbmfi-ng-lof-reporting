@@ -351,11 +351,11 @@ export const apiService = {
 
     const breakdown: any[] = [];
     const getOfficeLabel = (r: Role) => {
-        if (r === Role.NATIONAL_PRESIDENT || r === Role.NATIONAL_ADMIN || r === Role.NATIONAL_EXECUTIVE_COUNCIL) return "National HQ Events";
-        if (r === Role.REGIONAL_VICE_PRESIDENT || r === Role.REGIONAL_ADMIN || r === Role.REGIONAL_EXECUTIVE_COUNCIL) return "Regional HQ Events";
-        if (r === Role.DISTRICT_COORDINATOR || r === Role.DISTRICT_ADMIN || r === Role.DISTRICT_BOARD_MEMBER) return "District HQ Events";
-        if (r === Role.NATIONAL_DIRECTOR) return "Zonal HQ Events";
-        if (r === Role.FIELD_REPRESENTATIVE) return "Area HQ Events";
+        if (r === Role.NATIONAL_PRESIDENT || r === Role.NATIONAL_ADMIN || r === Role.NATIONAL_EXECUTIVE_COUNCIL) return "National Events";
+        if (r === Role.REGIONAL_VICE_PRESIDENT || r === Role.REGIONAL_ADMIN || r === Role.REGIONAL_EXECUTIVE_COUNCIL) return "Regional Events";
+        if (r === Role.DISTRICT_COORDINATOR || r === Role.DISTRICT_ADMIN || r === Role.DISTRICT_BOARD_MEMBER) return "District Events";
+        if (r === Role.NATIONAL_DIRECTOR) return "Zonal Events";
+        if (r === Role.FIELD_REPRESENTATIVE) return "Area Events";
         return "Office Events";
     };
 
