@@ -478,11 +478,37 @@ export const apiService = {
     }));
   },
 
-  archiveReportsByScope: async (scope: any, unitId: string, fromYear: number, toYear: number) => ({ success: true }),
+  archiveReportsByScope: async (scope: any, unitId: string, fromYear: number, toYear: number) => {
+      // In this implementation, 'Archiving' performs a pre-wipe validation 
+      // to ensure data exists and is accessible before the destructive wipe is allowed.
+      const { descendantIds } = await apiService.getAllDescendantIds(unitId);
+      const { data, error, count } = await supabase
+        .from('event_reports')
+        .select('id', { count: 'exact', head: true })
+        .in('unit_id', descendantIds)
+        .gte('date_of_event', `${fromYear}-01-01`)
+        .lte('date_of_event', `${toYear}-12-31`);
+      
+      if (error) throw new Error(`Archival validation failed: ${error.message}`);
+      if (count === 0) throw new Error("No records found in this scope to archive/wipe.");
+      
+      return { success: true, count };
+  },
+
   deleteReportsByScope: async (scope: any, unitId: string, fromYear: number, toYear: number) => {
       const { descendantIds } = await apiService.getAllDescendantIds(unitId);
-      if (descendantIds.length > 0) await supabase.from('event_reports').delete().in('unit_id', descendantIds).gte('date_of_event', `${fromYear}-01-01`).lte('date_of_event', `${toYear}-12-31`);
-      return { success: true };
+      if (descendantIds.length === 0) return { success: true, count: 0 };
+      
+      const { error, data } = await supabase
+        .from('event_reports')
+        .delete()
+        .in('unit_id', descendantIds)
+        .gte('date_of_event', `${fromYear}-01-01`)
+        .lte('date_of_event', `${toYear}-12-31`)
+        .select();
+        
+      if (error) throw new Error(`Scoped wipe failed: ${error.message}`);
+      return { success: true, count: data?.length || 0 };
   },
 
   submitEventReport: async (r: any) => {
@@ -513,5 +539,13 @@ export const apiService = {
       });
   },
 
-  clearAllData: () => supabase.from('event_reports').delete().neq('id', '0')
+  clearAllData: async () => {
+      const { error } = await supabase
+        .from('event_reports')
+        .delete()
+        .neq('id', '0');
+        
+      if (error) throw new Error(`Global wipe failed: ${error.message}`);
+      return { success: true };
+  }
 };
