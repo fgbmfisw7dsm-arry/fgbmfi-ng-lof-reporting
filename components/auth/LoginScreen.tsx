@@ -147,7 +147,7 @@ const LoginScreen: React.FC = () => {
           )}
           <div className="flex flex-col space-y-3">
             <button type="submit" disabled={isLoading} className={`w-full flex justify-center py-4 px-4 text-sm font-black rounded-2xl text-white shadow-lg transition-all cursor-pointer ${isLoading ? 'bg-green-600' : 'bg-fgbmfi-blue hover:bg-blue-800 active:scale-95'}`}>
-              {isLoading ? 'Connecting to Cloud...' : 'Sign In'}
+              {isLoading ? 'Connecting to Cloud...' : 'Login'}
             </button>
             {showReset && (
               <button type="button" onClick={handleResetConnection} className="w-full py-2 border border-gray-200 text-gray-400 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all">Reset Connection</button>

@@ -65,7 +65,7 @@ const UserManualPage: React.FC = () => {
         addSubTitle("Login");
         addBullet("Launch the application.");
         addBullet("Enter your assigned Username and Password.");
-        addBullet("Click Sign In.");
+        addBullet("Click Login.");
         
         addSubTitle("Change Password");
         addBullet("Click your Name/Profile Icon in the top-right corner.");
@@ -151,7 +151,7 @@ const UserManualPage: React.FC = () => {
         <ol style={{marginLeft: '20px', listStyleType: 'decimal'}}>
             <li>Launch the application.</li>
             <li>Enter your assigned <strong>Username</strong> and <strong>Password</strong>.</li>
-            <li>Click <strong>Sign In</strong>.</li>
+            <li>Click <strong>Login</strong>.</li>
         </ol>
 
         <h3 style={{fontSize: '18px', fontWeight: 'bold', marginTop: '16px', marginBottom: '8px'}}>Change Password</h3>
