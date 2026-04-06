@@ -167,6 +167,26 @@ const MaintenanceSection: React.FC<{ forceUpdate: () => void }> = ({ forceUpdate
                 )}
             </div>
 
+            <div className="bg-blue-50 p-8 rounded-[2rem] border border-blue-100">
+                <div className="flex items-center mb-6">
+                    <div className="p-3 bg-blue-100 text-blue-600 rounded-2xl mr-4">
+                        <Icon name="report" className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h4 className="text-xl font-black text-blue-900 tracking-tight">Year-End Process</h4>
+                        <p className="text-xs font-bold text-blue-400 uppercase tracking-widest">Guidance for New Year Readiness</p>
+                    </div>
+                </div>
+                <div className="text-sm text-blue-700/70 space-y-4 leading-relaxed">
+                    <p>The Dashboard automatically resets on January 1st of each year to show only current-year activity. To prepare for a new reporting year:</p>
+                    <ul className="list-disc list-inside space-y-2 ml-2">
+                        <li><strong>Review Previous Year:</strong> Use the Year Selector on the Dashboard to verify final totals for the closing year.</li>
+                        <li><strong>Archive Data:</strong> Use the Scoped Maintenance Console above to archive the previous year's data for your records.</li>
+                        <li><strong>Wipe (Optional):</strong> If you wish to clear the active database of old records, you may perform a Scoped Wipe after archiving. Note that this will remove the data from historical reports.</li>
+                    </ul>
+                </div>
+            </div>
+
             <div className="bg-red-50 p-8 rounded-[2rem] border border-red-100">
                 <div className="flex items-center mb-6">
                     <div className="p-3 bg-red-100 text-red-600 rounded-2xl mr-4">

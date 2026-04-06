@@ -298,8 +298,7 @@ export const apiService = {
     return { descendantIds: Array.from(new Set(descendantIds)), chapterIds: Array.from(new Set(chapterIds)) };
   },
 
-  getDashboardData: async (role: Role, unitId: string): Promise<DashboardStats> => {
-    const year = new Date().getFullYear();
+  getDashboardData: async (role: Role, unitId: string, year: number = new Date().getFullYear()): Promise<DashboardStats> => {
     const normalizedUnitId = unitId.trim().toUpperCase();
     const { descendantIds, chapterIds } = await apiService.getAllDescendantIds(normalizedUnitId);
 

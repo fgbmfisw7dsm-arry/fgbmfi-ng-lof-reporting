@@ -111,6 +111,10 @@ const UserManualPage: React.FC = () => {
         addBullet("Export Excel: Click to download the current data table as a .csv file.");
         y += 5;
 
+        addSectionTitle("5. Mobile Usage & Responsiveness");
+        addParagraph("The application is fully responsive. On mobile devices, the sidebar menu collapses into a hamburger icon. Wide tables and dashboards can be scrolled horizontally to view all columns.");
+        y += 5;
+
         addSectionTitle("Troubleshooting");
         addBullet("Empty Dashboard? Ensure you are viewing the current year.");
 
@@ -204,6 +208,14 @@ const UserManualPage: React.FC = () => {
         <ul style={{marginLeft: '20px', listStyleType: 'disc'}}>
             <li><strong>Export PDF:</strong> Click to generate a formatted PDF document of the current view.</li>
             <li><strong>Export Excel:</strong> Click to download the current data table as a <code>.csv</code> file compatible with Excel.</li>
+        </ul>
+
+        <h2 style={{color: '#B71C1C', fontSize: '20px', marginTop: '24px', marginBottom: '12px', fontWeight: 'bold'}}>5. Mobile Usage & Responsiveness</h2>
+        <p>The application is designed to be fully responsive. On mobile devices:</p>
+        <ul style={{marginLeft: '20px', listStyleType: 'disc'}}>
+            <li><strong>Navigation:</strong> The sidebar menu collapses into a "hamburger" menu icon in the top-left corner.</li>
+            <li><strong>Scrolling:</strong> Wide tables and dashboards can be scrolled <strong>horizontally</strong> (left to right) to view all columns.</li>
+            <li><strong>Forms:</strong> Input fields are optimized for touch, with numeric fields automatically triggering the numeric keypad on most devices.</li>
         </ul>
 
         <h2 style={{color: '#B71C1C', fontSize: '20px', marginTop: '24px', marginBottom: '12px', fontWeight: 'bold'}}>Troubleshooting</h2>

@@ -63,30 +63,36 @@ const AdminPage: React.FC = () => {
   const tabClass = (tab: string) => `py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab ? 'border-fgbmfi-blue text-fgbmfi-blue' : 'border-transparent text-gray-500 hover:text-gray-700'}`;
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Admin Panel</h1>
-      <div className="border-b border-gray-200 mb-6 overflow-x-auto scrollbar-hide">
-        <nav className="-mb-px flex space-x-8 whitespace-nowrap min-w-max px-1">
+    <div className="max-w-full overflow-hidden">
+      <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6">Admin Panel</h1>
+      
+      {/* Tab Navigation with Horizontal Scroll */}
+      <div className="border-b border-gray-200 mb-6 overflow-x-auto pb-1">
+        <nav className="-mb-px flex space-x-4 sm:space-x-8 whitespace-nowrap min-w-max px-1">
             <button onClick={() => setActiveTab('users')} className={tabClass('users')}>User Management</button>
             <button onClick={() => setActiveTab('org')} className={tabClass('org')}>Organizational Setup</button>
             <button onClick={() => setActiveTab('maintenance')} className={tabClass('maintenance')}>Maintenance</button>
             <button onClick={() => setActiveTab('manual')} className={tabClass('manual')}>Admin Manual</button>
         </nav>
       </div>
-      <div className="mt-4">
-        {isLoading ? (
-            <div className="text-center p-10 text-gray-500 flex flex-col items-center gap-2">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-fgbmfi-blue"></div>
-                <span>Syncing Cloud Registry...</span>
-            </div>
-        ) : (
-            <>
-                {activeTab === 'users' && <UserManagementSection orgData={orgData} users={users} setUsers={setUsers} />}
-                {activeTab === 'org' && <OrgSetupSection orgData={orgData} setOrgData={setOrgData} users={users} setUsers={setUsers} forceRefresh={forceUpdate} />}
-                {activeTab === 'maintenance' && <MaintenanceSection forceUpdate={forceUpdate} />}
-                {activeTab === 'manual' && <AdminManualPage />}
-            </>
-        )}
+
+      {/* Content Area with Horizontal Scroll for wide tables/grids */}
+      <div className="mt-4 overflow-x-auto pb-4">
+        <div className="min-w-full">
+            {isLoading ? (
+                <div className="text-center p-10 text-gray-500 flex flex-col items-center gap-2">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-fgbmfi-blue"></div>
+                    <span>Syncing Cloud Registry...</span>
+                </div>
+            ) : (
+                <>
+                    {activeTab === 'users' && <UserManagementSection orgData={orgData} users={users} setUsers={setUsers} />}
+                    {activeTab === 'org' && <OrgSetupSection orgData={orgData} setOrgData={setOrgData} users={users} setUsers={setUsers} forceRefresh={forceUpdate} />}
+                    {activeTab === 'maintenance' && <MaintenanceSection forceUpdate={forceUpdate} />}
+                    {activeTab === 'manual' && <AdminManualPage />}
+                </>
+            )}
+        </div>
       </div>
     </div>
   );

@@ -101,6 +101,11 @@ const AdminManualPage: React.FC = () => {
         addSectionTitle("Troubleshooting for Admins");
         addBullet("Fictitious Data? Admin should use 'Clear All Data' to remove system defaults.");
         addBullet("Empty Dashboard? Ensure you are viewing the current year.");
+        y += 5;
+
+        addSectionTitle("3. Mobile Administration");
+        addParagraph("The Admin Panel is optimized for mobile. Tabs and tables can be scrolled horizontally to access all management features and action buttons.");
+        y += 5;
 
         doc.save('LOF_Admin_Manual.pdf');
         setIsExporting(false);
@@ -177,6 +182,14 @@ const AdminManualPage: React.FC = () => {
             <li>If a former officer returns to service:</li>
             <li><strong>Action:</strong> Click <strong>Show Archived</strong> in the Officer Registry, locate the officer, and click <strong>Reactivate</strong>.</li>
             <li>Restore their real email and assign their new role/unit. The system will automatically switch you back to the active registry upon saving.</li>
+        </ul>
+
+        <h2 style={{color: '#B71C1C', fontSize: '20px', marginTop: '24px', marginBottom: '12px', fontWeight: 'bold'}}>3. Mobile Administration</h2>
+        <p>The Admin Panel is optimized for mobile management:</p>
+        <ul style={{marginLeft: '20px', listStyleType: 'disc'}}>
+            <li><strong>Horizontal Scrolling:</strong> The Admin Panel tabs (User Management, Org Setup, etc.) can be scrolled <strong>horizontally</strong> if they do not fit on your screen.</li>
+            <li><strong>Table Scrolling:</strong> The Officer Registry and Organizational Registry tables support horizontal scrolling to ensure all details and action buttons (Edit/Delete) are accessible.</li>
+            <li><strong>Responsive Grids:</strong> The Organizational Setup grid stacks vertically on smaller screens for easier navigation.</li>
         </ul>
 
         <h2 style={{color: '#B71C1C', fontSize: '20px', marginTop: '24px', marginBottom: '12px', fontWeight: 'bold'}}>Troubleshooting for Admins</h2>

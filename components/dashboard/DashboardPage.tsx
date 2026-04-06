@@ -12,13 +12,24 @@ const DashboardPage: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [filteredView, setFilteredView] = useState<{ name: string; stats: DashboardStats } | null>(null);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+  const years = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const startYear = 2024; // System start year
+    const yrs = [];
+    for (let y = currentYear; y >= startYear; y--) {
+      yrs.push(y);
+    }
+    return yrs;
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
       if (user) {
         setLoading(true);
         try {
-          const data = await apiService.getDashboardData(user.role, user.unitId);
+          const data = await apiService.getDashboardData(user.role, user.unitId, selectedYear);
           setStats(data);
           setFilteredView(null); // Reset drill-down view on user change or page load
         } catch (error) {
@@ -29,7 +40,7 @@ const DashboardPage: React.FC = () => {
       }
     };
     fetchData();
-  }, [user, dataVersion]);
+  }, [user, dataVersion, selectedYear]);
 
   const displayStats = useMemo(() => filteredView?.stats || stats, [filteredView, stats]);
 
@@ -39,7 +50,7 @@ const DashboardPage: React.FC = () => {
 
     setLoading(true);
     try {
-        const data = await apiService.getDashboardData(slice.role as Role, slice.unitId);
+        const data = await apiService.getDashboardData(slice.role as Role, slice.unitId, selectedYear);
         setFilteredView({
             name: slice.name,
             stats: data,
@@ -53,7 +64,7 @@ const DashboardPage: React.FC = () => {
 
   const resetView = () => setFilteredView(null);
 
-  if (loading) {
+  if (loading && !stats) {
     return <div className="text-center p-10">Loading Dashboard...</div>;
   }
 
@@ -63,16 +74,28 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div>
                 <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
                 {filteredView && (
                     <p className="text-sm text-gray-600">Showing data for: <span className="font-semibold">{filteredView.name}</span></p>
                 )}
             </div>
-            {filteredView && (
-                 <button onClick={resetView} className="bg-fgbmfi-blue text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-800">Reset View</button>
-            )}
+            <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Reporting Year:</label>
+                    <select 
+                        value={selectedYear} 
+                        onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                        className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-fgbmfi-blue outline-none"
+                    >
+                        {years.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                </div>
+                {filteredView && (
+                    <button onClick={resetView} className="bg-fgbmfi-blue text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-800">Reset View</button>
+                )}
+            </div>
         </div>
       
       {/* Stats Cards */}
