@@ -195,6 +195,7 @@ const AdminManualPage: React.FC = () => {
         <h2 style={{color: '#B71C1C', fontSize: '20px', marginTop: '24px', marginBottom: '12px', fontWeight: 'bold'}}>Troubleshooting for Admins</h2>
         <ul style={{marginLeft: '20px', listStyleType: 'disc'}}>
             <li><strong>Fictitious Data?</strong> If you see sample data after a system reset, an Admin may need to use "Clear All Data" to remove the system defaults.</li>
+            <li><strong>Removing Individual Records:</strong> To delete specific incorrect or zero-entry reports, use the <strong>My Submissions</strong> view in the Reports tab and click the <strong>red trash icon</strong> next to the record.</li>
             <li><strong>Empty Dashboard?</strong> Ensure you are viewing the current year, as the dashboard filters for the current year by default. Check "My Reports" for historical data.</li>
         </ul>
       </div>

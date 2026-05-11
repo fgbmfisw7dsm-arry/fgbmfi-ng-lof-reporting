@@ -20,6 +20,10 @@ const ReportsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState<'detailed' | 'matrix' | 'my-submissions'>('detailed');
   const [editingReport, setEditingReport] = useState<EventReport | null>(null);
+  const [reportToDelete, setReportToDelete] = useState<EventReport | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const [orgRegistry, setOrgRegistry] = useState<{
     regions: Region[], districts: District[], zones: Zone[], areas: Area[], chapters: Chapter[]
@@ -369,8 +373,95 @@ const ReportsPage: React.FC = () => {
     setEditingReport(null);
   };
 
+  const handleDeleteReport = (report: EventReport) => {
+    setDeleteError(null);
+    setReportToDelete(report);
+  };
+
+  const confirmDelete = async (e?: React.MouseEvent) => {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    if (!reportToDelete || isDeleting) return;
+    
+    setIsDeleting(true);
+    setDeleteError(null);
+    const reportId = reportToDelete.id;
+    
+    try {
+        await apiService.deleteEventReport(reportId);
+        
+        // Success: Update local state
+        setMyEventReports(prev => prev.filter(r => r.id !== reportId));
+        setEventReports(prev => prev.filter(r => r.id !== reportId));
+        
+        setReportToDelete(null);
+        refreshData(); 
+    } catch (err) {
+        console.error("Delete failed", err);
+        const errorMessage = err instanceof Error ? err.message : "Failed to delete the report. Please try again.";
+        setDeleteError(errorMessage);
+        // We don't refreshData here to keep the modal open so they can see the error
+    } finally {
+        setIsDeleting(false);
+    }
+  };
+
   return (
-    <div className="printable-area">
+    <div className="printable-area pb-40 min-h-full flex flex-col">
+      {/* Custom Confirmation Modal for Deletion */}
+      {reportToDelete && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-8 border border-red-50 animate-in fade-in zoom-in duration-200">
+            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mb-6">
+              <Icon name="trash" className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-black text-gray-900 tracking-tight">Confirm Deletion</h3>
+            <p className="text-gray-500 mt-2 text-sm font-medium leading-relaxed">
+              Are you sure you want to permanently delete this <span className="text-fgbmfi-blue font-bold">{reportToDelete.eventType}</span> report from <span className="font-bold text-gray-700">{new Date(reportToDelete.dateOfEvent).toLocaleDateString()}</span>? 
+              This action cannot be undone.
+            </p>
+
+            {deleteError && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-xl flex items-start space-x-3 text-red-600 animate-in fade-in slide-in-from-top-2">
+                <Icon name="close" className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                <div className="text-xs font-bold leading-relaxed">
+                  {deleteError}
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4 mt-8">
+              <button 
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setReportToDelete(null);
+                  setDeleteError(null);
+                }}
+                disabled={isDeleting}
+                className="py-3 bg-gray-100 text-gray-600 text-xs font-black uppercase tracking-widest rounded-xl hover:bg-gray-200 transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button 
+                type="button"
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="py-3 bg-fgbmfi-red text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-red-800 transition-all disabled:opacity-50 flex items-center justify-center"
+              >
+                {isDeleting ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : "Delete Now"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-8 gap-4 print:hidden">
         <div>
           <h1 className="text-3xl font-black text-gray-900 tracking-tight">Reports Portal</h1>
@@ -450,6 +541,7 @@ const ReportsPage: React.FC = () => {
                 <EventReportList 
                     reports={myEventReports} 
                     onEdit={handleEditReport} 
+                    onDelete={handleDeleteReport}
                     user={user!} 
                 />
             </div>
@@ -462,6 +554,9 @@ const ReportsPage: React.FC = () => {
           )}
         </div>
       )}
+      </div>
+      {/* Spacer to ensure scrolling to the very bottom is possible */}
+      <div className="h-40 print:hidden" aria-hidden="true" />
     </div>
   );
 };

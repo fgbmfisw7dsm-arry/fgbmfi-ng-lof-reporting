@@ -33,21 +33,8 @@ const LoginScreen: React.FC = () => {
   });
 
   useEffect(() => {
-    // Connectivity check on mount
-    const checkConnectivity = async () => {
-        try {
-            const { error } = await supabase.from('profiles').select('id').limit(1);
-            if (error && error.code !== 'PGRST116') {
-                console.warn("LoginScreen: Initial connectivity check returned error:", error);
-            } else {
-                console.log("LoginScreen: Supabase connectivity verified.");
-            }
-        } catch (e) {
-            console.error("LoginScreen: Supabase connectivity check failed:", e);
-            setError("Cannot reach cloud database. Please check your internet connection or VPN settings.");
-        }
-    };
-    checkConnectivity();
+    // Basic initialization
+    console.log("LoginScreen: Mount");
   }, []);
 
   useEffect(() => {
@@ -68,32 +55,16 @@ const LoginScreen: React.FC = () => {
     setError('');
     setIsLoading(true);
     
-    // Safety timeout for the login attempt itself
-    const loginTimeout = window.setTimeout(() => {
-        if (isLoading) {
-            setError("The cloud connection is taking longer than expected. Please check your internet or try the 'Reset Connection' button below.");
-            setIsLoading(false);
-            setShowReset(true);
-        }
-    }, 65000); // Increased to 65s (slightly more than AuthProvider's 60s)
-
     try {
-        console.log("LoginScreen: Performing pre-login connectivity check...");
-        const { error: connError } = await supabase.from('profiles').select('id').limit(1);
-        if (connError && connError.code !== 'PGRST116') {
-            console.warn("LoginScreen: Pre-login check failed:", connError);
-        }
-
         console.log("LoginScreen: Attempting login for", identifier);
         await login(identifier, password);
         console.log("LoginScreen: Login call returned successfully.");
     } catch (err: any) {
         console.error("LoginScreen: Login error:", err);
         setError(err.message || 'Login failed. Check your credentials.');
-        setIsLoading(false);
-        setShowReset(true); // Ensure reset is available on failure
+        setShowReset(true); 
     } finally {
-        window.clearTimeout(loginTimeout);
+        setIsLoading(false);
     }
   };
 

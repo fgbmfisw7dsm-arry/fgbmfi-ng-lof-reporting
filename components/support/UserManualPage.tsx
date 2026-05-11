@@ -111,6 +111,13 @@ const UserManualPage: React.FC = () => {
         addBullet("Export Excel: Click to download the current data table as a .csv file.");
         y += 5;
 
+        addSubTitle("My Submissions & Correcting Data");
+        addBullet("Navigate to 'My Reports' and select the 'My Submissions' view tab.");
+        addBullet("This shows a list of all individual event reports you have submitted.");
+        addBullet("Edit: Click the pencil icon to correct data in a report.");
+        addBullet("Delete: Click the red trash icon to permanently remove an incorrect or zero-entry report.");
+        y += 5;
+
         addSectionTitle("5. Mobile Usage & Responsiveness");
         addParagraph("The application is fully responsive. On mobile devices, the sidebar menu collapses into a hamburger icon. Wide tables and dashboards can be scrolled horizontally to view all columns.");
         y += 5;
@@ -208,6 +215,13 @@ const UserManualPage: React.FC = () => {
         <ul style={{marginLeft: '20px', listStyleType: 'disc'}}>
             <li><strong>Export PDF:</strong> Click to generate a formatted PDF document of the current view.</li>
             <li><strong>Export Excel:</strong> Click to download the current data table as a <code>.csv</code> file compatible with Excel.</li>
+        </ul>
+
+        <h3 style={{fontSize: '18px', fontWeight: 'bold', marginTop: '16px', marginBottom: '8px'}}>My Submissions & Correcting Data</h3>
+        <p>In the <strong>My Reports</strong> tab, use the <strong>My Submissions</strong> view to manage your data:</p>
+        <ul style={{marginLeft: '20px', listStyleType: 'disc'}}>
+            <li><strong>Edit:</strong> Use the <strong>pencil icon</strong> to update figures for an existing report.</li>
+            <li><strong>Delete:</strong> Use the <strong>red trash icon</strong> to permanently delete reports that were entered in error (e.g., duplicated entries or entries that have been cleared to zero).</li>
         </ul>
 
         <h2 style={{color: '#B71C1C', fontSize: '20px', marginTop: '24px', marginBottom: '12px', fontWeight: 'bold'}}>5. Mobile Usage & Responsiveness</h2>

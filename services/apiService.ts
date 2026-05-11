@@ -239,6 +239,23 @@ export const apiService = {
 
     return 'SUCCESS';
   },
+  deleteEventReport: async (reportId: string) => {
+    const reportUuid = String(reportId).trim();
+    if (!reportUuid) throw new Error("Delete failed: Missing report ID.");
+
+    // Attempt Delete
+    const { error, status } = await supabase
+      .from('event_reports')
+      .delete()
+      .eq('id', reportUuid);
+    
+    if (error) {
+      console.error('Supabase Delete Error:', error);
+      throw new Error(`Deletion Failed: Database rejected the request. ${error.message}`);
+    }
+
+    return 'SUCCESS';
+  },
   upsertEventType: async (et: EventType) => {
     const { error } = await supabase.from('event_types').upsert({ id: et.id, name: et.name }, { onConflict: 'id' });
     if (error) throw error;

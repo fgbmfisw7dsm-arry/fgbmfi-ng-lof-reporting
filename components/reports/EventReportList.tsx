@@ -6,10 +6,11 @@ import Icon from '../ui/Icon';
 interface EventReportListProps {
   reports: EventReport[];
   onEdit: (report: EventReport) => void;
+  onDelete?: (report: EventReport) => void;
   user: User;
 }
 
-const EventReportList: React.FC<EventReportListProps> = ({ reports, onEdit, user }) => {
+const EventReportList: React.FC<EventReportListProps> = ({ reports, onEdit, onDelete, user }) => {
   if (reports.length === 0) {
     return (
       <div className="bg-white p-12 rounded-[2rem] shadow-sm border border-gray-100 text-center">
@@ -40,9 +41,12 @@ const EventReportList: React.FC<EventReportListProps> = ({ reports, onEdit, user
           </thead>
           <tbody>
             {sortedReports.map((report) => {
-              // Only allow editing if the user is the owner (same unitId) 
-              // or if they are an admin (National/Regional/District Admin)
-              const canEdit = report.unitId.toUpperCase() === user.unitId.toUpperCase() || 
+              // Only allow editing if they are the owner,
+              // or if the report belongs to their direct unit,
+              // or if they are an admin
+              const isOwner = report.reportingOfficerId === user.id;
+              const canEdit = isOwner ||
+                              report.unitId.toUpperCase() === user.unitId.toUpperCase() || 
                               user.role.includes('ADMIN') || 
                               user.unitId.toUpperCase() === 'NATIONAL';
 
@@ -65,13 +69,29 @@ const EventReportList: React.FC<EventReportListProps> = ({ reports, onEdit, user
                   </td>
                   <td className="px-6 py-4 text-right border-b border-gray-50">
                     {canEdit && (
-                      <button 
-                        onClick={() => onEdit(report)}
-                        className="p-2 text-fgbmfi-blue hover:bg-blue-50 rounded-lg transition-all"
-                        title="Edit Report"
-                      >
-                        <Icon name="edit" className="w-4 h-4" />
-                      </button>
+                      <div className="flex justify-end space-x-1">
+                        <button 
+                          type="button"
+                          onClick={() => onEdit(report)}
+                          className="p-3 text-fgbmfi-blue hover:bg-blue-50 rounded-xl transition-all"
+                          title="Edit Report"
+                        >
+                          <Icon name="edit" className="w-5 h-5" />
+                        </button>
+                        {onDelete && (
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              console.log("Delete button clicked internally");
+                              onDelete(report);
+                            }}
+                            className="p-3 text-fgbmfi-red hover:bg-red-50 rounded-xl transition-all relative z-10 cursor-pointer flex items-center justify-center min-w-[44px] min-h-[44px]"
+                            title="Delete Report"
+                          >
+                            <Icon name="trash" className="w-5 h-5 pointer-events-none" />
+                          </button>
+                        )}
+                      </div>
                     )}
                   </td>
                 </tr>
