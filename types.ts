@@ -24,6 +24,9 @@ export interface User {
   password: string;
   role: Role;
   unitId: string; 
+  isActive?: boolean;
+  deactivatedAt?: string;
+  reactivatedAt?: string;
 }
 
 export interface Chapter {

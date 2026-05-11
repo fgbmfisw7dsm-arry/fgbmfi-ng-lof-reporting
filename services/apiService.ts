@@ -18,7 +18,10 @@ export const apiService = {
       if (error) throw new Error(`Registry Load Error: ${error.message}`);
       return (data || []).map(p => ({
           id: p.id, name: p.name, username: p.username, email: p.email,
-          phone: p.phone || '', password: '', role: p.role as Role, unitId: p.unit_id
+          phone: p.phone || '', password: '', role: p.role as Role, unitId: p.unit_id,
+          isActive: p.is_active !== false,
+          deactivatedAt: p.deactivated_at,
+          reactivatedAt: p.reactivated_at
       }));
   },
 
@@ -33,7 +36,10 @@ export const apiService = {
       if (error) throw new Error(`Archive Load Error: ${error.message}`);
       return (data || []).map(p => ({
           id: p.id, name: p.name, username: p.username, email: p.email,
-          phone: p.phone || '', password: '', role: p.role as Role, unitId: p.unit_id
+          phone: p.phone || '', password: '', role: p.role as Role, unitId: p.unit_id,
+          isActive: p.is_active !== false,
+          deactivatedAt: p.deactivated_at,
+          reactivatedAt: p.reactivated_at
       }));
   },
 
@@ -70,15 +76,19 @@ export const apiService = {
           throw new Error("Missing required profile fields.");
       }
       const isDeletedUsername = user.username.startsWith('deleted_');
-      const payload = {
+      const payload: any = {
           id: user.id, 
           name: user.name || 'New Officer',
           username: (isDeletedUsername || !user.username ? user.email.split('@')[0] : user.username).toLowerCase().trim(),
           email: user.email.toLowerCase().trim(),
           role: user.role,
           unit_id: user.unitId.trim().toUpperCase(),
-          phone: user.phone || ''
+          phone: user.phone || '',
+          is_active: user.isActive !== false
       };
+
+      if (user.deactivatedAt) payload.deactivated_at = user.deactivatedAt;
+      if (user.reactivatedAt) payload.reactivated_at = user.reactivatedAt;
       
       console.log("apiService: Upserting profile for", payload.email);
       const { error, data } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' }).select();
@@ -126,6 +136,32 @@ export const apiService = {
       }
       
       return true;
+  },
+
+  deactivateUser: async (userId: string) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ 
+        is_active: false, 
+        deactivated_at: new Date().toISOString() 
+      })
+      .eq('id', userId);
+    
+    if (error) throw new Error(`Deactivation failed: ${error.message}`);
+    return true;
+  },
+
+  reactivateUser: async (userId: string) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ 
+        is_active: true, 
+        reactivated_at: new Date().toISOString() 
+      })
+      .eq('id', userId);
+    
+    if (error) throw new Error(`Reactivation failed: ${error.message}`);
+    return true;
   },
 
   adminResetPassword: async (userId: string) => {

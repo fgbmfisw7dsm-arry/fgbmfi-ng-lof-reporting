@@ -25,6 +25,18 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
         userName: ''
     });
 
+    const [activationConfirm, setActivationConfirm] = useState<{ 
+        isOpen: boolean; 
+        userId: string; 
+        userName: string; 
+        action: 'deactivate' | 'reactivate' 
+    }>({
+        isOpen: false,
+        userId: '',
+        userName: '',
+        action: 'deactivate'
+    });
+
     useEffect(() => {
         refreshUserList();
     }, [showArchived]);
@@ -131,6 +143,27 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
         }
     };
 
+    const handleConfirmActivation = async () => {
+        const { userId, userName, action } = activationConfirm;
+        setActivationConfirm({ ...activationConfirm, isOpen: false });
+        setIsLoading(true);
+        setStatusNote(null);
+        try {
+            if (action === 'deactivate') {
+                await apiService.deactivateUser(userId);
+                setStatusNote({ msg: `Officer profile for ${userName} has been deactivated. They can no longer log in.`, type: 'success' });
+            } else {
+                await apiService.reactivateUser(userId);
+                setStatusNote({ msg: `Officer profile for ${userName} has been reactivated.`, type: 'success' });
+            }
+            await refreshUserList();
+        } catch (error: any) {
+            setStatusNote({ msg: error.message, type: 'error' });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleResetPassword = async (userId: string, userName: string) => {
         setIsLoading(true);
         setStatusNote(null);
@@ -232,8 +265,27 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
                         {users.length > 0 ? users.map((u) => (
                             <tr key={u.id} className={`hover:bg-gray-50/50 transition-colors ${showArchived ? 'opacity-75' : ''}`}>
                                 <td className="px-6 py-4">
-                                    <div className="text-sm font-bold text-gray-900">{u.name}</div>
-                                    <div className="text-[10px] text-gray-400 font-medium">{u.email}</div>
+                                    <div className="flex items-center">
+                                        <div className="flex-shrink-0">
+                                            <div className="text-sm font-bold text-gray-900">{u.name}</div>
+                                            <div className="text-[10px] text-gray-400 font-medium">{u.email}</div>
+                                        </div>
+                                        {u.isActive === false && (
+                                            <span className="ml-3 px-2 py-0.5 bg-red-100 text-red-700 text-[8px] font-black uppercase rounded-full border border-red-200">
+                                                Inactive
+                                            </span>
+                                        )}
+                                    </div>
+                                    {u.isActive === false && u.deactivatedAt && (
+                                        <div className="text-[8px] text-red-400 mt-1 font-bold italic">
+                                            Paused: {new Date(u.deactivatedAt).toLocaleDateString()}
+                                        </div>
+                                    )}
+                                    {u.isActive !== false && u.reactivatedAt && (
+                                        <div className="text-[8px] text-green-400 mt-1 font-bold italic">
+                                            Reactivated: {new Date(u.reactivatedAt).toLocaleDateString()}
+                                        </div>
+                                    )}
                                 </td>
                                 <td className="px-6 py-4">
                                     <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase ${
@@ -247,14 +299,24 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
                                 <td className="px-6 py-4 text-xs font-bold text-gray-500">{getUnitName(u)}</td>
                                 <td className="px-6 py-4 text-right space-x-4">
                                     {!showArchived && (
-                                        <button 
-                                            onClick={() => handleResetPassword(u.id, u.name)} 
-                                            disabled={isLoading}
-                                            className="text-[10px] font-black uppercase text-orange-500 hover:text-orange-700 disabled:opacity-30"
-                                            title="Reset user password to 123456"
-                                        >
-                                            Reset
-                                        </button>
+                                        <>
+                                            <button 
+                                                onClick={() => handleResetPassword(u.id, u.name)} 
+                                                disabled={isLoading}
+                                                className="text-[10px] font-black uppercase text-orange-500 hover:text-orange-700 disabled:opacity-30"
+                                                title="Reset user password to 123456"
+                                            >
+                                                Reset
+                                            </button>
+                                            <button 
+                                                onClick={() => setActivationConfirm({ isOpen: true, userId: u.id, userName: u.name, action: u.isActive === false ? 'reactivate' : 'deactivate' })} 
+                                                disabled={isLoading}
+                                                className={`text-[10px] font-black uppercase disabled:opacity-30 ${u.isActive === false ? 'text-green-600 hover:text-green-800' : 'text-gray-400 hover:text-gray-600'}`}
+                                                title={u.isActive === false ? "Reactivate account" : "Deactivate account"}
+                                            >
+                                                {u.isActive === false ? 'Reactivate' : 'Deactivate'}
+                                            </button>
+                                        </>
                                     )}
                                     <button 
                                         onClick={() => { setEditingUser(u); setModalOpen(true); }} 
@@ -294,6 +356,19 @@ const UserManagementSection: React.FC<UserManagementSectionProps> = ({ orgData, 
                           IMPORTANT: All historical reports submitted by this officer will be PERMANENTLY PRESERVED in the system.`}
                 confirmButtonText="Yes, Archive"
                 confirmButtonClass="bg-orange-600"
+            />
+
+            <ConfirmationModal 
+                isOpen={activationConfirm.isOpen} 
+                onClose={() => setActivationConfirm({ ...activationConfirm, isOpen: false })} 
+                onConfirm={handleConfirmActivation} 
+                title={activationConfirm.action === 'deactivate' ? "Deactivate Officer Account?" : "Reactivate Officer Account?"} 
+                message={activationConfirm.action === 'deactivate' 
+                    ? `Are you sure you want to deactivate "${activationConfirm.userName}"? They will be unable to log into the portal until reactivated. Their data and profile will be preserved.`
+                    : `Are you sure you want to reactivate the account for "${activationConfirm.userName}"?`
+                }
+                confirmButtonText={activationConfirm.action === 'deactivate' ? "Yes, Deactivate" : "Yes, Reactivate"}
+                confirmButtonClass={activationConfirm.action === 'deactivate' ? "bg-gray-600" : "bg-fgbmfi-blue"}
             />
         </div>
     );

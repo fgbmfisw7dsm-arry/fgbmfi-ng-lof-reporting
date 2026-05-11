@@ -13,7 +13,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = useCallback(async (id: string): Promise<'FOUND' | 'MISSING' | 'ERROR'> => {
+  const fetchProfile = useCallback(async (id: string): Promise<'FOUND' | 'MISSING' | 'ERROR' | 'DEACTIVATED'> => {
       console.log("AuthProvider: Fetching profile for ID:", id);
       
       try {
@@ -33,6 +33,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
 
           if (data) {
+              if (data.is_active === false) {
+                  console.warn("AuthProvider: Access denied for deactivated user");
+                  await supabase.auth.signOut().catch(() => {});
+                  return 'DEACTIVATED';
+              }
+              
               if (data.role === Role.FORMER_OFFICER || (data.email && data.email.toLowerCase().endsWith('@archived.lof'))) {
                   console.warn("AuthProvider: Access denied for archived user");
                   await supabase.auth.signOut().catch(() => {});
@@ -214,6 +220,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const status = await fetchProfile(authData.user.id);
             if (status === 'MISSING') {
                 throw new Error("Profile not found. Please contact your Administrator to activate your account.");
+            } else if (status === 'DEACTIVATED') {
+                throw new Error("Your account is temporary deactivated, please contact the LOF Admin.");
             } else if (status === 'ERROR') {
                 throw new Error("Authentication succeeded, but profile sync failed. Please check your internet connection and try again.");
             }
